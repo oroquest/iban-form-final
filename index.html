@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IBAN Erhebung – Sikura Life</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; background: #f4f4f4; }
+    .container { background: #fff; padding: 2rem; border-radius: 8px; max-width: 600px; margin: auto; }
+    img { max-width: 150px; margin-bottom: 20px; }
+    label { display: block; margin: 1rem 0 0.5rem; font-weight: bold; }
+    input, select, textarea { width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    button { background: #800040; color: #fff; border: none; padding: 0.75rem 1.5rem; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #660033; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="siku_logo.PNG" alt="Sikura Life Logo" />
+    <h1>IBAN Erhebung</h1>
+    <form name="iban" method="POST" data-netlify="true" action="/danke.html">
+      <label for="language">Sprache wählen</label>
+      <select name="language" required>
+        <option value="">Bitte wählen</option>
+        <option>Deutsch</option>
+        <option>Italiano</option>
+        <option>English</option>
+      </select>
+
+      <label for="name">Vor- und Nachname</label>
+      <input type="text" name="name" required />
+
+      <label for="email">E-Mail-Adresse</label>
+      <input type="email" name="email" required />
+
+      <label for="iban">IBAN (Format: CHxx xxxx xxxx xxxx xxxx x)</label>
+      <input type="text" name="iban" pattern="CH\d{2}\s?\d{5}\s?\d{12}" required />
+
+      <label for="vertrag">Vertrags-/Policennummer</label>
+      <input type="text" name="vertrag" required />
+
+      <label for="passnummer">Passnummer (optional)</label>
+      <input type="text" name="passnummer" />
+
+      <label for="lei">LEI-Nummer (optional)</label>
+      <input type="text" name="lei" />
+
+      <label>
+        <input type="checkbox" name="richtigkeit" required />
+        Ich bestätige, dass meine Angaben korrekt sind.
+      </label>
+
+      <label>
+        <input type="checkbox" name="dsgvo" required />
+        Ich bin mit der Verwendung meiner Daten gemäss Datenschutzerklärung einverstanden.
+      </label>
+
+      <button type="submit">Übermitteln</button>
+    </form>
+  </div>
+</body>
+</html>

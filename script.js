@@ -1,4 +1,3 @@
-
 function setLanguage(lang) {
   const i18n = {
     de: {
@@ -45,3 +44,20 @@ function setLanguage(lang) {
     el.textContent = i18n[lang][key] || el.textContent;
   });
 }
+
+document.getElementById("iban").addEventListener("blur", function () {
+  const iban = this.value.replace(/\s+/g, "");
+  if (!iban) return;
+
+  fetch(`https://openiban.com/validate/${iban}?getBIC=true&validateBankCode=true`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.valid) {
+        alert("Diese IBAN ist ungültig. Bitte überprüfen Sie Ihre Eingabe.");
+        this.focus();
+      }
+    })
+    .catch(() => {
+      alert("IBAN-Prüfung derzeit nicht möglich.");
+    });
+});

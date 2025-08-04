@@ -62,5 +62,19 @@
   <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("iban-form");
+  form.addEventListener("submit", function (e) {
+    const response = grecaptcha.getResponse();
+    if (response.length === 0) {
+      e.preventDefault();
+      alert("Bitte bestätigen Sie das reCAPTCHA, bevor Sie das Formular absenden.");
+    }
+  });
+});
+</script>
 </body>
+
 </html>

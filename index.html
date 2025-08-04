@@ -12,6 +12,7 @@
   <div class="container">
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
     <form name="iban-form" method="POST" data-netlify="true" action="danke.html" id="iban-form">
+      <input type="hidden" name="form-name" value="iban-form" />
       <div class="language-switcher">
         <label for="language"><strong>Language:</strong></label>
         <select id="language" onchange="setLanguage(this.value)">

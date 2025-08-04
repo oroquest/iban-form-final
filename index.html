@@ -7,6 +7,10 @@
   <title>Sikura IBAN Formular</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
+
+<!-- Google reCAPTCHA -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
 </head>
 <body>
   <div class="container">
@@ -52,7 +56,10 @@
         <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
       </div>
 
-      <button type="submit" data-i18n="submit">Absenden</button>
+      
+<div class="g-recaptcha" data-sitekey="6Le8HZorAAAAAHGK6nqVH-YbOvpkkG9WcIX1osUq" style="margin-top: 1rem;"></div>
+
+  <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
 </body>

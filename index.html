@@ -7,18 +7,11 @@
   <title>Sikura IBAN Formular</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
-
-<!-- Google reCAPTCHA -->
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
 </head>
 <body>
   <div class="container">
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
-    <form name="iban-form" onsubmit="return onSubmit();" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="danke.html" id="iban-form">
-  <input type="hidden" name="form-name" value="iban-form" />
-  <input type="text" name="bot-field" style="display:none" />
-      <input type="hidden" name="form-name" value="iban-form" />
+    <form name="iban-form" method="POST" data-netlify="true" action="danke.html" id="iban-form">
       <div class="language-switcher">
         <label for="language"><strong>Language:</strong></label>
         <select id="language" onchange="setLanguage(this.value)">
@@ -47,102 +40,17 @@
       <label for="note" data-i18n="note">Betreff / Bemerkungen</label>
       <textarea id="note" name="note"></textarea>
 
-      <div class="checkbox-group" style="display: flex; align-items: flex-start; margin-top: 1rem;">
-        <label style="flex: 1;"><input type="checkbox" style="margin-right: 0.5rem;" name="confirm" required />
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="confirm" required />
         <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind und meine aktuellen Bankdaten widerspiegeln.</span></label>
       </div>
-      <div class="checkbox-group" style="display: flex; align-items: flex-start; margin-top: 1rem;">
-        <label style="flex: 1;"><input type="checkbox" style="margin-right: 0.5rem;" name="privacy" required />
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="privacy" required />
         <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
       </div>
 
-      
-<div class="g-recaptcha" data-sitekey="6Le8HZorAAAAAHGK6nqVH-YbOvpkkG9WcIX1osUq" style="margin-top: 1rem;"></div>
-
-  <button type="submit" data-i18n="submit">Absenden</button>
+      <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.getElementById("iban-form");
-  form.addEventListener("submit", function (e) {
-    const response = grecaptcha.getResponse();
-    if (response.length === 0) {
-      e.preventDefault();
-      alert("Bitte bestätigen Sie das reCAPTCHA, bevor Sie das Formular absenden.");
-    }
-  });
-});
-</script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.getElementById("iban-form");
-
-  form.addEventListener("submit", function (e) {
-    const response = grecaptcha.getResponse();
-
-    if (response.length === 0) {
-      e.preventDefault();
-      alert("Bitte bestätigen Sie das reCAPTCHA, bevor Sie das Formular absenden.");
-      return;
-    }
-
-    // Falls noch nicht vorhanden: einfügen als verstecktes Feld
-    let tokenField = document.querySelector("input[name='g-recaptcha-response']");
-    if (!tokenField) {
-      tokenField = document.createElement("input");
-      tokenField.type = "hidden";
-      tokenField.name = "g-recaptcha-response";
-      form.appendChild(tokenField);
-    }
-
-    tokenField.value = response;
-  });
-});
-</script>
-
-<script>
-function onSubmit() {
-  const response = grecaptcha.getResponse();
-  if (response.length === 0) {
-    alert("Bitte bestätigen Sie das reCAPTCHA, bevor Sie das Formular absenden.");
-    return false;
-  }
-  return true;
-}
-</script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.getElementById("iban-form");
-
-  form.addEventListener("submit", function (e) {
-    const response = grecaptcha.getResponse();
-
-    if (response.length === 0) {
-      e.preventDefault();
-      alert("Bitte bestätigen Sie das reCAPTCHA, bevor Sie das Formular absenden.");
-      return;
-    }
-
-    // Token als verstecktes Feld übergeben
-    let tokenField = document.querySelector("input[name='g-recaptcha-response']");
-    if (!tokenField) {
-      tokenField = document.createElement("input");
-      tokenField.type = "hidden";
-      tokenField.name = "g-recaptcha-response";
-      form.appendChild(tokenField);
-    }
-
-    tokenField.value = response;
-  });
-});
-</script>
 </body>
-
-
-
-
 </html>

@@ -1,196 +1,56 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>IBAN Secure Demo – Multilingual</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: Arial, sans-serif; background: #f4f7fa; padding: 2rem; }
-    .container { max-width: 640px; margin: auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    h2 { text-align: center; }
-    label { font-weight: bold; display: block; margin-top: 1rem; }
-    input[type=text], textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; border: 1px solid #ccc; border-radius: 4px; }
-    .checkbox-label { margin-top: 1rem; font-size: 0.95rem; }
-    .checkbox-label input { margin-right: 0.5rem; }
-    button { margin-top: 1.5rem; padding: 0.7rem; background: #004085; color: white; border: none; width: 100%; font-size: 1rem; }
-    .success, .error { display: none; margin-top: 1rem; font-weight: bold; }
-    .success { color: green; }
-    .error { color: red; }
-    .logo { display: block; margin: 0 auto 1rem auto; width: 160px; }
-    .lang-select { text-align: right; margin-bottom: 1rem; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sikura IBAN Formular</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
   <div class="container">
-    <img src="siku_logo.PNG" alt="SIKURA Logo" class="logo" />
-    <div class="lang-select">
-      <label for="lang">Language:</label>
-      <select id="lang">
-        <option value="en">English</option>
-        <option value="de" selected>Deutsch</option>
-        <option value="it">Italiano</option>
-      </select>
-    </div>
-    <h2 id="form-title">Bitte bestätigen Sie Ihre IBAN</h2>
-    <form name="iban"
-  <input type="hidden" name="form-name" value="iban" /> method="POST" data-netlify="true" action="danke.html" id="iban-form">
-      <label id="iban-label">IBAN</label>
-      <input type="text" id="iban" required />
+    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
+    <form name="iban-form" method="POST" data-netlify="true" action="danke.html" id="iban-form">
+      <div class="language-switcher">
+        <label for="language"><strong>Language:</strong></label>
+        <select id="language" onchange="setLanguage(this.value)">
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <h2 data-i18n="title">Bitte bestätigen Sie Ihre IBAN</h2>
 
-      <label id="address-label">Aktuelle Adresse</label>
-      <input type="text" id="address" required />
+      <label for="iban" data-i18n="iban">IBAN</label>
+      <input type="text" id="iban" name="iban" required />
 
-      <label id="contract-label">Vertragsnummer</label>
-      <input type="text" id="contract" required />
+      <label for="address" data-i18n="address">Aktuelle Adresse</label>
+      <input type="text" id="address" name="address" required />
 
-      <label id="passport-label">Passnummer (optional)</label>
-      <input type="text" id="passport" maxlength="4" />
+      <label for="contract" data-i18n="contract">Vertragsnummer</label>
+      <input type="text" id="contract" name="contract" required />
 
-      <label id="lei-label">LEI (optional für juristische Personen)</label>
-      <input type="text" id="lei" />
+      <label for="passport" data-i18n="passport">Passnummer (optional)</label>
+      <input type="text" id="passport" name="passport" />
 
-      <label id="betreff-label">Betreff / Bemerkungen</label>
-      <textarea id="betreff"></textarea>
+      <label for="lei" data-i18n="lei">LEI (optional für juristische Personen)</label>
+      <input type="text" id="lei" name="lei" />
 
-      <div class="checkbox-label">
-        <input type="checkbox" required />
-        <span id="confirm-text">Ich bestätige, dass die angegebenen Daten korrekt sind und meine aktuellen Bankdaten widerspiegeln.</span>
+      <label for="note" data-i18n="note">Betreff / Bemerkungen</label>
+      <textarea id="note" name="note"></textarea>
+
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="confirm" required />
+        <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind und meine aktuellen Bankdaten widerspiegeln.</span></label>
+      </div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="privacy" required />
+        <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
       </div>
 
-      <div class="checkbox-label">
-        <input type="checkbox" required />
-        <span id="consent-text">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span>
-      </div>
-
-      <button type="submit" id="submit-btn">Absenden</button>
-      <div class="success" id="success-msg">✔️ Erfolgreich eingereicht</div>
-      <div class="error" id="error-msg">❌ IBAN oder Vertragsnummer ungültig</div>
-      <button type="button" id="export-btn" style="display:none;">⬇ CSV-Export</button>
+      <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
-
-  <script>
-    const translations = {
-      de: {
-        title: "Bitte bestätigen Sie Ihre IBAN",
-        ibanLabel: "IBAN",
-        addressLabel: "Aktuelle Adresse",
-        contractLabel: "Vertragsnummer",
-        passportLabel: "Passnummer (optional)",
-        leiLabel: "LEI (optional für juristische Personen)",
-        betreffLabel: "Betreff / Bemerkungen",
-        confirmText: "Ich bestätige, dass die angegebenen Daten korrekt sind und meine aktuellen Bankdaten widerspiegeln.",
-        consentText: "Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.",
-        submitBtn: "Absenden",
-        success: "✔️ Erfolgreich eingereicht",
-        error: "❌ IBAN oder Vertragsnummer ungültig"
-      },
-      en: {
-        title: "Please confirm your IBAN",
-        ibanLabel: "IBAN",
-        addressLabel: "Current address",
-        contractLabel: "Contract number",
-        passportLabel: "Passport number (optional)",
-        leiLabel: "LEI (optional for legal entities)",
-        betreffLabel: "Subject / Notes",
-        confirmText: "I confirm that the information provided is correct and reflects my current banking details.",
-        consentText: "I consent to the processing of my data for the purpose of claim settlement of SIKURA Leben AG. i.L. in accordance with GDPR.",
-        submitBtn: "Submit",
-        success: "✔️ Successfully submitted",
-        error: "❌ Invalid IBAN or contract number"
-      },
-      it: {
-        title: "Si prega di confermare il proprio IBAN",
-        ibanLabel: "IBAN",
-        addressLabel: "Indirizzo attuale",
-        contractLabel: "Numero del contratto",
-        passportLabel: "Numero del passaporto (opzionale)",
-        leiLabel: "LEI (opzionale per persone giuridiche)",
-        betreffLabel: "Oggetto / Note",
-        confirmText: "Confermo che le informazioni fornite sono corrette e riflettono i miei dati bancari attuali.",
-        consentText: "Acconsento al trattamento dei miei dati nell'ambito della procedura concorsuale di SIKURA Leben AG. i.L. ai sensi del GDPR.",
-        submitBtn: "Invia",
-        success: "✔️ Inviato con successo",
-        error: "❌ IBAN o numero di contratto non valido"
-      }
-    };
-
-    document.getElementById("lang").addEventListener("change", function () {
-      const lang = this.value;
-      const t = translations[lang];
-      document.getElementById("form-title").textContent = t.title;
-      document.getElementById("iban-label").textContent = t.ibanLabel;
-      document.getElementById("address-label").textContent = t.addressLabel;
-      document.getElementById("contract-label").textContent = t.contractLabel;
-      document.getElementById("passport-label").textContent = t.passportLabel;
-      document.getElementById("lei-label").textContent = t.leiLabel;
-      document.getElementById("betreff-label").textContent = t.betreffLabel;
-      document.getElementById("confirm-text").textContent = t.confirmText;
-      document.getElementById("consent-text").textContent = t.consentText;
-      document.getElementById("submit-btn").textContent = t.submitBtn;
-      document.getElementById("success-msg").textContent = t.success;
-      document.getElementById("error-msg").textContent = t.error;
-    });
-
-    function isValidIBAN(iban) {
-      iban = iban.replace(/\s+/g, '').toUpperCase();
-      if (!iban.match(/^[A-Z0-9]+$/) || iban.length < 15 || iban.length > 34) return false;
-      iban = iban.slice(4) + iban.slice(0, 4);
-      const A = 'A'.charCodeAt(0);
-      const converted = iban.split('').map(ch => {
-        const code = ch.charCodeAt(0);
-        return code >= A ? (code - A + 10).toString() : ch;
-      }).join('');
-      let remainder = converted, block;
-      while (remainder.length > 2) {
-        block = remainder.slice(0, 9);
-        remainder = (parseInt(block, 10) % 97).toString() + remainder.slice(block.length);
-      }
-      return parseInt(remainder, 10) % 97 === 1;
-    }
-
-    function isValidContract(contract) {
-      return /^[A-Z]{5,}[0-9\-]*$/.test(contract.trim());
-    }
-
-    const entries = [];
-    const exportBtn = document.getElementById("export-btn");
-
-    document.getElementById("iban-form").addEventListener("submit", function (event) {
-      event.preventDefault();
-      const iban = document.getElementById("iban").value.trim();
-      const contract = document.getElementById("contract").value.trim();
-      const validIBAN = isValidIBAN(iban);
-      const validContract = isValidContract(contract);
-      const isValid = validIBAN && validContract;
-      if (!validIBAN) alert("❌ Die IBAN ist ungültig.");
-      if (!validContract) alert("❌ Die Vertragsnummer ist ungültig.");
-      document.getElementById("success-msg").style.display = isValid ? "block" : "none";
-      document.getElementById("error-msg").style.display = isValid ? "none" : "block";
-
-      if (isValid) {
-        entries.push({
-          iban: iban,
-          contract: contract,
-          timestamp: new Date().toISOString()
-        });
-        exportBtn.style.display = "block";
-      }
-    });
-
-    exportBtn.addEventListener("click", () => {
-      const csv = "IBAN;Contract;Timestamp\n" + entries.map(e =>
-        `${e.iban};${e.contract};${e.timestamp}`
-      ).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.setAttribute("href", URL.createObjectURL(blob));
-      link.setAttribute("download", "iban_secure_export.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
-  </script>
 </body>
 </html>

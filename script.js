@@ -53,11 +53,25 @@ document.getElementById("iban").addEventListener("blur", function () {
     .then(res => res.json())
     .then(data => {
       if (!data.valid) {
-        alert("Diese IBAN ist ungültig. Bitte überprüfen Sie Ihre Eingabe.");
-        this.focus();
+        const msg = document.createElement("div");
+        msg.innerText = "Diese IBAN ist ungültig. Bitte überprüfen Sie Ihre Eingabe.";
+        msg.style.position = "fixed";
+        msg.style.top = "20px";
+        msg.style.left = "50%";
+        msg.style.transform = "translateX(-50%)";
+        msg.style.background = "#f44336";
+        msg.style.color = "white";
+        msg.style.padding = "1rem 2rem";
+        msg.style.borderRadius = "8px";
+        msg.style.zIndex = "9999";
+        document.body.appendChild(msg);
+        setTimeout(() => {
+          document.body.removeChild(msg);
+          document.getElementById("iban").focus();
+        }, 3000);
       }
     })
     .catch(() => {
-      alert("IBAN-Prüfung derzeit nicht möglich.");
+      console.warn("IBAN check failed.");
     });
 });

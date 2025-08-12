@@ -1,4 +1,3 @@
-// /index.js (v3) — POST to iban_ro with body (more reliable through proxies)
 (function(){
   const qs = new URLSearchParams(location.search);
   const id    = qs.get('id')||'';
@@ -16,10 +15,9 @@
 
   function renderKV(obj){
     const host = document.getElementById('ro-list');
-    if(!host) return;
     host.innerHTML = '';
     const pairs = Object.entries(obj||{});
-    if(!pairs.length){ host.innerHTML = '<p>Keine Daten vorhanden.</p>'; return; }
+    if(!pairs.length){ host.innerHTML = '<p class="small">Keine Daten vorhanden.</p>'; return; }
     for(const [k,v] of pairs){
       const row = document.createElement('div');
       row.className = 'ro-row';
@@ -31,20 +29,9 @@
 
   async function init(){
     try{
-      if(!token || !em){ msg('Link ist unvollständig.'); return; }
-
-      const payload = new URLSearchParams();
-      payload.set('id', id);
-      payload.set('token', token);
-      payload.set('em', em);
-      payload.set('lang', lang);
-
-      const r = await fetch(`/.netlify/functions/iban_ro`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/x-www-form-urlencoded', 'Accept':'application/json' },
-        body: payload.toString()
-      });
-
+      if(!token || !em){ msg('Link unvollständig.'); return; }
+      const url = `/.netlify/functions/iban_check?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`;
+      const r = await fetch(url, { cache:'no-store' });
       if(!r.ok){ msg('Link ungültig oder abgelaufen.'); return; }
       const j = await r.json();
 

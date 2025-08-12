@@ -10,8 +10,7 @@
 <body>
   <main class="container">
     <h1>IBAN Erhebung</h1>
-
-    <section id="ro" aria-labelledby="ro-title">
+    <section aria-labelledby="ro-title">
       <h2 id="ro-title">Ihre bereits erfassten Angaben</h2>
       <div id="ro-list" class="readonly-grid"></div>
     </section>
@@ -26,7 +25,7 @@
       <div class="field">
         <label for="iban">IBAN</label>
         <input id="iban" name="iban" autocomplete="off" required inputmode="text" spellcheck="false" />
-        <small class="hint">Bitte ohne Leerzeichen eingeben.</small>
+        <div class="small">Bitte ohne Leerzeichen oder Sonderzeichen eingeben.</div>
       </div>
 
       <div class="field">
@@ -37,6 +36,8 @@
       <button type="submit" id="submitBtn">Senden</button>
       <div id="msg" role="status" aria-live="polite"></div>
     </form>
+
+    <footer>© Sikura</footer>
   </main>
 
   <script src="/index.js" defer></script>

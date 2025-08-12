@@ -1,182 +1,111 @@
-// netlify/functions/iban_submit.js
+
+let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
+if (!fetchImpl) { fetchImpl = require('node-fetch'); }
+const fetchFn = (...args) => fetchImpl(...args);
+
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-// Feature-Toggles
-const ENFORCE_EXPIRY     = true;   // Token muss vor Ablauf genutzt werden
-const ENFORCE_SINGLE_USE = true;   // Token darf nur 1x genutzt werden
+const ENFORCE_EXPIRY     = true;
+const ENFORCE_SINGLE_USE = true;
 
-function parseFormBody(event) {
+function parseBody(event) {
   const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
-  if (ct.includes('application/json')) {
-    try { return JSON.parse(event.body || '{}'); } catch { return {}; }
+  if (ct.includes('application/json')) { try { return JSON.parse(event.body||'{}'); } catch { return {}; } }
+  try { const params = new URLSearchParams(event.body||''); const o={}; params.forEach((v,k)=>o[k]=v); return o; } catch { return {}; }
+}
+function b64urlDecode(s){ if(!s) return ''; s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; try {return Buffer.from(s,'base64').toString('utf8')}catch{return ''} }
+function firstIp(xff){ return xff ? String(xff).split(',')[0].trim() : '' }
+function sanitizeUA(ua){ return String(ua||'').replace(/[\u0000-\u001F]+/g,'').trim().slice(0,255) }
+
+function isValidIBAN(input){
+  const s = String(input||'').replace(/\s+/g,'').toUpperCase();
+  if(!/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/.test(s)) return false;
+  const rearr = s.slice(4)+s.slice(0,4);
+  const expanded = rearr.replace(/[A-Z]/g,ch=>(ch.charCodeAt(0)-55).toString());
+  let rem=0;
+  for(let i=0;i<expanded.length;i++){
+    const code = expanded.charCodeAt(i)-48;
+    if(code<0||code>35) return false;
+    rem=(rem*10+code)%97;
   }
-  try {
-    const params = new URLSearchParams(event.body || '');
-    const obj = {};
-    for (const [k, v] of params.entries()) obj[k] = v;
-    return obj;
-  } catch { return {}; }
+  return rem===1;
 }
 
-function b64urlDecode(input) {
-  if (!input) return '';
-  let s = String(input).replace(/-/g, '+').replace(/_/g, '/');
-  while (s.length % 4 !== 0) s += '=';
-  try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
-}
-
-function sanitizeHeader(s){ return String(s||'').replace(/[\r\n]+/g,' ').slice(0,200); }
-function firstIpFromHeader(xff) {
-  if (!xff) return '';
-  return String(xff).split(',')[0].trim();
-}
-function sanitizeUA(ua) {
-  return String(ua || '').replace(/[\u0000-\u001F]+/g, '').trim().slice(0, 255);
-}
-
-// --- Serverseitige Pflichtfeld- & PLZ-Validierung (Helper) ---
-function isFilled(s) { return String(s ?? '').trim().length > 0; }
-function validatePLZ(plz, country) {
-  const p = String(plz || '').trim();
-  const c = String(country || '').trim().toUpperCase();
-  if (!p) return false;
-  // CH/LI → 4-stellig
-  if (c === 'CH' || c === 'LI') return /^\d{4}$/.test(p);
-  // DE/IT → 5-stellig
-  if (c === 'DE' || c === 'IT') return /^\d{5}$/.test(p);
-  // Fallback (konservativ): 4–6 Ziffern
-  return /^\d{4,6}$/.test(p);
+async function mjGetContactIdByEmail(email) {
+  const r = await fetchFn(`https://api.mailjet.com/v3/REST/contact/?ContactEmail=${encodeURIComponent(email)}`, {
+    headers: { Authorization: mjAuth }
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(`Mailjet contact fetch failed: ${r.status} ${t}`); }
+  const j = await r.json();
+  const id = j?.Data?.[0]?.ID;
+  if (!id) throw new Error(`Mailjet contact not found for ${email}`);
+  return id;
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+  try{
+    if(event.httpMethod!=='POST') return { statusCode:405, body:'Method Not Allowed' };
+    const H = event.headers||{};
+    const body = parseBody(event);
 
-  const data = parseFormBody(event);
-  let { id, token, em, email, lang, firstname, name, strasse, hausnummer, plz, ort, country, land } = data;
+    let { id, token, em, email, lang, iban, iban_confirm } = body;
+    if(!email && em) email = b64urlDecode(em).trim();
+    if(!email || !token) return { statusCode:400, body:'Missing token/email' };
 
-  if (!email && em) email = b64urlDecode(em).trim();
-  if (!country && land) country = land;
+    if(!iban || !iban_confirm) return { statusCode:400, body:'Missing IBAN fields' };
+    const cleanIBAN = String(iban).replace(/\s+/g,'');
+    const cleanIBAN2 = String(iban_confirm).replace(/\s+/g,'');
+    if(cleanIBAN !== cleanIBAN2) return { statusCode:422, body:'IBAN mismatch' };
+    if(!isValidIBAN(cleanIBAN)) return { statusCode:422, body:'IBAN invalid' };
 
-  if (!id || !token || !email) {
-    return { statusCode: 400, body: 'Missing required parameters (id/token/email)' };
-  }
+    const userAgent = sanitizeUA(H['user-agent']||H['User-Agent']||'');
+    const ip = firstIp(H['x-forwarded-for']||H['X-Forwarded-For']) || H['x-nf-client-connection-ip'] || H['client-ip'] || H['x-real-ip'] || 'unknown';
+    const nowISO = new Date().toISOString();
 
-  // --- Serverseitige Pflichtfeld- & PLZ-Validierung (DSGVO/Audit) ---
-  // hausnummer bleibt optional; country kann via "land" gekommen sein (oben gemappt)
-  if (!isFilled(firstname) || !isFilled(name) || !isFilled(strasse) || !isFilled(plz) || !isFilled(ort) || !isFilled(country)) {
-    return { statusCode: 400, body: 'Missing required address fields' };
-  }
-  if (!validatePLZ(plz, country)) {
-    return { statusCode: 400, body: 'Invalid postal code' };
-  }
+    const contactId = await mjGetContactIdByEmail(email);
 
-  // Request-Metadaten
-  const H = event.headers || {};
-  const userAgent = sanitizeUA(H['user-agent'] || H['User-Agent'] || '');
-  const ip =
-    firstIpFromHeader(H['x-forwarded-for'] || H['X-Forwarded-For']) ||
-    H['x-nf-client-connection-ip'] || H['client-ip'] || H['x-real-ip'] || 'unknown';
-  const nowISO = new Date().toISOString();
-
-  try {
-    // 1) Mailjet Contact-Properties holen
-    const r = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+    const r = await fetchFn(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(contactId)}`, {
       headers: { Authorization: mjAuth }
     });
-    if (!r.ok) {
-      const t = await r.text();
-      return { statusCode: 502, body: `Mailjet fetch failed: ${t}` };
-    }
-    const json = await r.json();
-    const propsArray = json.Data?.[0]?.Data || [];
-    const theProps = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
+    if(!r.ok) return { statusCode:502, body:'Mailjet fetch failed' };
+    const j = await r.json();
+    const propsArr = (j && j.Data && j.Data[0] && j.Data[0].Data) ? j.Data[0].Data : [];
+    const props = Object.fromEntries(propsArr.map(p=>[p.Name,p.Value]));
 
-    // 2) Pflicht-Validierungen (ID/Token)
-    const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
-    const tokenVerify   = (theProps['token_iban'] || '').toString().trim();
+    const tokenStored = String(props.token_iban||'');
+    const expiryRaw   = String(props.token_iban_expiry||props.Token_iban_expiry||'');
 
-    if (glaeubigerVal !== String(id).trim()) {
-      return { statusCode: 403, body: 'ID mismatch' };
-    }
-    if (!tokenVerify || tokenVerify !== token) {
-      return { statusCode: 403, body: 'Invalid token' };
-    }
+    if(!tokenStored) return { statusCode:401, body:'Token missing' };
+    if(ENFORCE_SINGLE_USE && String(props.token_iban_used_at||'').trim()!=='') { return { statusCode:409, body:'Token already used' }; }
+    if(tokenStored !== String(token)) return { statusCode:401, body:'Token mismatch' };
+    if(ENFORCE_EXPIRY && expiryRaw){ const exp = new Date(expiryRaw); if(isFinite(exp) && exp < new Date()) return { statusCode:410, body:'Token expired' }; }
 
-    // 3) One-Time-Use prüfen (token_iban_used_at)
-    const tokenUsedAt = (theProps['token_iban_used_at'] || '').toString().trim();
-    if (ENFORCE_SINGLE_USE && tokenUsedAt) {
-      return { statusCode: 409, body: 'Token already used' };
-    }
+    const Data = [
+      { Name:'iban',               Value: cleanIBAN },
+      { Name:'ip_iban',           Value: ip },
+      { Name:'timestamp_iban',    Value: nowISO },
+      { Name:'agent_iban',        Value: userAgent },
+      { Name:'token_iban_used_at',Value: nowISO },
+      { Name:'token_iban',        Value: '' },
+      { Name:'token_iban_expiry', Value: '' }
+    ];
 
-    // 4) Ablauf prüfen (token_iban_expiry bevorzugt, Fallbacks möglich)
-    const expiryRaw =
-      theProps['token_iban_expiry'] ||
-      theProps['token_iban_expiry'] ||
-      theProps['token_expiry'] ||
-      '';
-    if (ENFORCE_EXPIRY && expiryRaw) {
-      const exp = new Date(expiryRaw);
-      if (isFinite(exp) && exp < new Date()) {
-        return { statusCode: 410, body: 'Token expired' };
-      }
-    }
-
-    // 5) Updates vorbereiten
-    const updates = [];
-    const setIf = (Name, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') updates.push({ Name, Value: String(v) }); };
-    const set    = (Name, v) => { updates.push({ Name, Value: String(v ?? '') }); };
-
-    // Adressfelder: nur befüllte Felder überschreiben
-    setIf('firstname',  firstname);
-    setIf('name',       name);
-    setIf('strasse',    strasse);
-    setIf('hausnummer', hausnummer);
-    setIf('plz',        plz);
-    setIf('ort',        ort);
-    setIf('country',    country);
-
-    // Audit (IP, Timestamp, User-Agent)
-    setIf('ip_verify',        ip);
-    setIf('timestamp_verify', nowISO);
-    setIf('agent_verify',     userAgent);
-
-    // One-Time-Use markieren & Token/Ablauf leeren
-    set('token_iban_used_at', nowISO);
-    set('token_iban',  '');
-    set('token_iban_expiry', '');
-
-    // 6) Mailjet-Update
-    const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      method: 'PUT',
-      headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Data: updates })
+    const u = await fetchFn(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(contactId)}`, {
+      method:'PUT', headers:{ Authorization: mjAuth, 'Content-Type':'application/json' }, body: JSON.stringify({ Data })
     });
-    if (!put.ok) {
-      const t = await put.text();
-      return { statusCode: 502, body: `Mailjet update failed: ${t}` };
-    }
+    if(!u.ok){ const t = await u.text(); return { statusCode:502, body:`Mailjet update failed: ${t}` }; }
 
-    // 7) Erfolg → je nach Clienttyp JSON oder Redirect
-    const isAjax = /json/i.test(event.headers['accept'] || '') ||
-                   (event.headers['x-requested-with'] || '').toLowerCase() === 'fetch';
-    if (isAjax) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ok: true, redirect: 'https://verify.sikuralife.com/danke.html' })
-      };
+    const accept = (H['accept']||H['Accept']||'').toLowerCase();
+    const danke = '/danke.html';
+    if(accept.includes('application/json')){
+      return { statusCode:200, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:true, redirect:danke }) };
     }
-    return {
-      statusCode: 302,
-      headers: { Location: 'https://verify.sikuralife.com/danke.html' },
-      body: ''
-    };
+    return { statusCode:302, headers:{ Location: danke }, body:'' };
 
-  } catch (err) {
-    return { statusCode: 500, body: `Server error: ${err.message}` };
+  }catch(err){
+    const debug = process.env.DEBUG === '1';
+    return debug ? { statusCode:500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:String(err?.message||err) }) } : { statusCode:500, body:'Server error' };
   }
 };

@@ -1,4 +1,4 @@
-// netlify/functions/iban_ro.js  (v3: accepts GET or POST; reads query AND body)
+// netlify/functions/iban_ro.js
 let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
 if (!fetchImpl) { fetchImpl = require('node-fetch'); }
 const fetchFn = (...args) => fetchImpl(...args);
@@ -11,14 +11,15 @@ const ENFORCE_EXPIRY = true;
 const BASE_URL = process.env.BASE_PUBLIC_URL || 'https://iban.sikuralife.com';
 const INTERNAL_KEY = process.env.GET_CONTACT_INTERNAL_KEY || '';
 
-function parseBody(event){
-  const ct=(event.headers['content-type']||event.headers['Content-Type']||'').toLowerCase();
-  if(ct.includes('application/json')){ try{return JSON.parse(event.body||'{}')}catch{return {}} }
-  try{ const o={}; new URLSearchParams(event.body||'').forEach((v,k)=>o[k]=v); return o; }catch{return {}}
-}
 function b64urlDecode(s){ if(!s) return ''; s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; try {return Buffer.from(s,'base64').toString('utf8')}catch{return ''} }
 function normalizePairs(arr){ return Object.fromEntries((arr||[]).map(p=>[p.Name, p.Value])); }
 const jres = (code, obj) => ({ statusCode: code, headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) });
+
+function parseBody(event){
+  const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
+  if (ct.includes('application/json')) { try { return JSON.parse(event.body||'{}'); } catch { return {}; } }
+  try { const o={}; new URLSearchParams(event.body||'').forEach((v,k)=>o[k]=v); return o; } catch { return {}; }
+}
 
 async function mjGetContactIdByEmail(email) {
   const r = await fetchFn(`https://api.mailjet.com/v3/REST/contact/?ContactEmail=${encodeURIComponent(email)}`, {
@@ -35,20 +36,14 @@ exports.handler = async (event) => {
   try {
     const q = event.queryStringParameters || {};
     const b = (event.httpMethod === 'POST') ? parseBody(event) : {};
-    // accept from query OR body (body wins if present)
-    let id     = (b.id     ?? q.id     ?? '').toString();
-    let token  = (b.token  ?? q.token  ?? '').toString();
-    let em     = (b.em     ?? q.em     ?? '').toString();
-    let email  = (b.email  ?? q.email  ?? '').toString();
-    let lang   = (b.lang   ?? q.lang   ?? 'de').toString();
+    let id    = b.id    || q.id    || '';
+    let token = b.token || q.token || '';
+    let em    = b.em    || q.em    || '';
+    let email = b.email || q.email || '';
+    const lang = (b.lang || q.lang || 'de').toLowerCase();
 
     if(!email && em) email = b64urlDecode(em).trim();
-    if(!email || !token){
-      const debug = process.env.DEBUG === '1';
-      return debug
-        ? jres(400, { ok:false, error:'Missing token/email', got:{ query:q, body:b } })
-        : jres(400, { ok:false, error:'Missing token/email' });
-    }
+    if(!email || !token) return jres(400, { ok:false, error:'Missing token/email', got:{ query:q, body:b } });
 
     // 1) Mailjet: fetch contact props & validate token
     const contactId = await mjGetContactIdByEmail(email);
@@ -69,24 +64,25 @@ exports.handler = async (event) => {
       if(isFinite(exp) && exp < new Date()) return jres(410, { ok:false, error:'Token expired' });
     }
 
-    // 2) Try internal get_contact (GET first, then POST) with x-internal-key
+    // 2) Try internal get_contact via server
     let readonly = null;
     let raw = null;
     if (INTERNAL_KEY) {
       try {
         const url = `${BASE_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}&id=${encodeURIComponent(id||'')}`;
         const g = await fetchFn(url, { headers: { 'x-internal-key': INTERNAL_KEY, 'accept':'application/json' } });
-        if (g.ok) {
-          raw = await g.json().catch(()=>null);
-        } else {
+        if (g.ok) raw = await g.json().catch(()=>null);
+      } catch {}
+      if (!raw) {
+        try {
           const p = await fetchFn(`${BASE_URL}/.netlify/functions/get_contact`, {
             method:'POST',
             headers: { 'x-internal-key': INTERNAL_KEY, 'content-type': 'application/json', 'accept':'application/json' },
             body: JSON.stringify({ email, id })
           });
           if (p.ok) raw = await p.json().catch(()=>null);
-        }
-      } catch (e) { /* ignore */ }
+        } catch {}
+      }
     }
 
     if (raw && typeof raw === 'object') {
@@ -95,6 +91,7 @@ exports.handler = async (event) => {
       else readonly = raw;
     }
 
+    // 3) Fallback: derive readonly from Mailjet props
     if (!readonly) {
       readonly = {};
       for (const [k,v] of Object.entries(props)) {

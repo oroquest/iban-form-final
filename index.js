@@ -1,4 +1,4 @@
-// /index.js (v3) — POST to iban_ro with body (more reliable through proxies)
+// /index.js — ensure no inline script, only external file (complies with CSP 'self')
 (function(){
   const qs = new URLSearchParams(location.search);
   const id    = qs.get('id')||'';
@@ -31,20 +31,14 @@
 
   async function init(){
     try{
-      if(!token || !em){ msg('Link ist unvollständig.'); return; }
-
-      const payload = new URLSearchParams();
-      payload.set('id', id);
-      payload.set('token', token);
-      payload.set('em', em);
-      payload.set('lang', lang);
-
-      const r = await fetch(`/.netlify/functions/iban_ro`, {
+      if(!token || (!em && !qs.get('email'))){ msg('Link ist unvollständig.'); return; }
+      const body = { id, token, em, lang };
+      const r = await fetch('/.netlify/functions/iban_ro', {
         method:'POST',
-        headers:{ 'Content-Type':'application/x-www-form-urlencoded', 'Accept':'application/json' },
-        body: payload.toString()
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store'
       });
-
       if(!r.ok){ msg('Link ungültig oder abgelaufen.'); return; }
       const j = await r.json();
 

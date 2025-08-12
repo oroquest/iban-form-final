@@ -4,23 +4,14 @@
   const token = qs.get('token')||'';
   const em    = qs.get('em')||'';
   const lang  = qs.get('lang')||'de';
-
   const $ = (id)=>document.getElementById(id);
   const msg = (t)=>{ const el=$('msg'); if(el){ el.textContent = t; } };
-
-  $('id').value = id;
-  $('token').value = token;
-  $('em').value = em;
-  $('lang').value = lang;
-
+  $('id').value = id; $('token').value = token; $('em').value = em; $('lang').value = lang;
   function renderReadonly(readonly){
     const host = document.getElementById('ro-list');
     host.innerHTML = '';
     const keys = Object.keys(readonly||{});
-    if(!keys.length){
-      host.innerHTML = '<p>Keine Daten vorhanden.</p>';
-      return;
-    }
+    if(!keys.length){ host.innerHTML = '<p>Keine Daten vorhanden.</p>'; return; }
     for(const k of keys){
       const v = readonly[k];
       const row = document.createElement('div');
@@ -35,7 +26,6 @@
       host.appendChild(row);
     }
   }
-
   function isValidIBAN(s){
     s = String(s||'').replace(/\s+/g,'').toUpperCase();
     if(!/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/.test(s)) return false;
@@ -49,7 +39,6 @@
     }
     return rem===1;
   }
-
   async function init(){
     try{
       const r = await fetch(`/.netlify/functions/iban_check?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`, { credentials:'omit' });
@@ -57,47 +46,22 @@
       const j = await r.json();
       const email = j.email || '';
       $('email').value = email;
-
       renderReadonly(j.readonly || {});
       document.getElementById('ibanForm').style.display = 'block';
-    }catch(e){
-      msg('Fehler beim Laden.');
-    }
+    }catch(e){ msg('Fehler beim Laden.'); }
   }
-
   document.getElementById('ibanForm').addEventListener('submit', async (ev)=>{
     ev.preventDefault();
     const iban = $('iban').value.trim();
     const iban2 = $('iban_confirm').value.trim();
     if(iban !== iban2){ msg('IBAN stimmt nicht überein.'); return; }
     if(!isValidIBAN(iban)){ msg('IBAN ungültig.'); return; }
-
     const payload = new URLSearchParams();
-    payload.set('id', id);
-    payload.set('token', token);
-    payload.set('em', em);
-    payload.set('lang', lang);
-    payload.set('email', $('email').value);
-    payload.set('iban', iban);
-    payload.set('iban_confirm', iban2);
-
-    const r = await fetch('/.netlify/functions/iban_submit', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
-      body: payload.toString()
-    });
-
-    if(r.status===302 || r.redirected){
-      location.href = '/danke.html'; return;
-    }
-    if(r.ok){
-      const j = await r.json().catch(()=>({}));
-      if(j && j.redirect){ location.href = j.redirect; return; }
-      location.href = '/danke.html'; return;
-    }
-    const t = await r.text();
-    msg('Fehler: '+t);
+    payload.set('id', id); payload.set('token', token); payload.set('em', em); payload.set('lang', lang); payload.set('email', $('email').value); payload.set('iban', iban); payload.set('iban_confirm', iban2);
+    const r = await fetch('/.netlify/functions/iban_submit', { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, body: payload.toString() });
+    if(r.status===302 || r.redirected){ location.href = '/danke.html'; return; }
+    if(r.ok){ const j = await r.json().catch(()=>({})); if(j && j.redirect){ location.href = j.redirect; return; } location.href = '/danke.html'; return; }
+    const t = await r.text(); msg('Fehler: '+t);
   });
-
   init();
 })();

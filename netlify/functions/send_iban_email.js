@@ -1,6 +1,6 @@
 // netlify/functions/send_iban_email.js
 // Generates token_iban + token_iban_expiry, stores on Mailjet contact, and sends email with link to /iban.html
-// Mirrors your verify batch sender behaviour (JSON response with templateId, expiresAt, url).
+// Batch-compatible response (templateId, expiresAt, url). Uses DE/EN + DIRECT/LAWYER template envs.
 
 const crypto = require('crypto');
 
@@ -8,17 +8,19 @@ const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-// Public base URL of your site (same you use for verify)
 const BASE_URL = process.env.BASE_PUBLIC_URL || 'https://verify.sikuralife.com';
-// Expiry in days for IBAN tokens (default 7)
 const EXPIRY_DAYS = parseInt(process.env.IBAN_TOKEN_DAYS || '7', 10);
 
-// Mailjet template IDs per language (fallback to DE if missing)
+// Templates per language & category (DIRECT/LAWYER) — align with verify naming
 const TPL = {
-  de: Number(process.env.MJ_TPL_IBAN_DE || 0),
-  fr: Number(process.env.MJ_TPL_IBAN_FR || 0),
-  it: Number(process.env.MJ_TPL_IBAN_IT || 0),
-  en: Number(process.env.MJ_TPL_IBAN_EN || 0),
+  de: {
+    direct: Number(process.env.TEMPLATE_DE_IBAN_DIRECT || 0),
+    lawyer: Number(process.env.TEMPLATE_DE_IBAN_LAWYER || 0)
+  },
+  en: {
+    direct: Number(process.env.TEMPLATE_EN_IBAN_DIRECT || 0),
+    lawyer: Number(process.env.TEMPLATE_EN_IBAN_LAWYER || 0)
+  }
 };
 
 function b64url(input) {
@@ -27,7 +29,15 @@ function b64url(input) {
 }
 function pickLang(x) {
   const s = String(x || 'de').toLowerCase();
-  return (s === 'fr' || s === 'it' || s === 'en') ? s : 'de';
+  return (s === 'en') ? 'en' : 'de'; // only DE/EN for IBAN
+}
+function pickTemplate(lang, category) {
+  const l = pickLang(lang);
+  const c = String(category || 'direct').toLowerCase();
+  const group = TPL[l] || TPL.de;
+  // normalize: allow 'lawyer' or anything else default to 'direct'
+  const key = c.includes('lawyer') ? 'lawyer' : 'direct';
+  return group[key] || group.direct || 0;
 }
 function parseBody(event) {
   const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
@@ -61,6 +71,7 @@ async function mjUpdateContactDataByEmail(email, kv) {
 }
 
 async function mjSendTemplateMail({ toEmail, templateId, variables }) {
+  if (!templateId || Number(templateId) === 0) return; // no-op if not configured
   const r = await fetch('https://api.mailjet.com/v3.1/send', {
     method: 'POST',
     headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
@@ -89,7 +100,7 @@ exports.handler = async (event) => {
     const email = String(body.email || '').trim();
     const id    = String(body.id || '').trim();
     const lang  = pickLang(body.lang);
-    const category = String(body.category || '').trim(); // passt einfach durch, falls Template es nutzt
+    const category = String(body.category || '').trim();
 
     if (!email || !id) return { statusCode: 400, body: 'Missing email or id' };
 
@@ -98,28 +109,26 @@ exports.handler = async (event) => {
     const expiresAt = addDays(new Date(), EXPIRY_DAYS);
     const expiresISO = iso(expiresAt);
 
-    // 2) Contact-Felder aktualisieren (GENAU wie vorgegeben)
+    // 2) Contact-Felder aktualisieren (exakt wie vorgegeben)
     await mjUpdateContactDataByEmail(email, {
       token_iban: token,
       token_iban_expiry: expiresISO,
       token_iban_used_at: '' // reset
     });
 
-    // 3) Link bauen (wie verify): /iban.html?id=...&token=...&em=...&lang=...
+    // 3) Link bauen: /iban.html?id=...&token=...&em=...&lang=...
     const em = b64url(email);
     const url = `${BASE_URL}/iban.html?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`;
 
-    // 4) Template nach Sprache
-    const templateId = TPL[lang] || TPL.de;
+    // 4) Template wählen und Mail senden (falls Template-IDs gesetzt)
+    const templateId = pickTemplate(lang, category);
+    await mjSendTemplateMail({
+      toEmail: email,
+      templateId,
+      variables: { url, id, lang, category }
+    });
 
-    if (templateId) {
-      await mjSendTemplateMail({
-        toEmail: email,
-        templateId,
-        variables: { url, id, lang, category }
-      });
-    }
-
+    // 5) Response für Batch
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-// /index.js (Frontend on ROOT) — calls iban_ro server proxy
+// /index.js (v3) — POST to iban_ro with body (more reliable through proxies)
 (function(){
   const qs = new URLSearchParams(location.search);
   const id    = qs.get('id')||'';
@@ -31,9 +31,20 @@
 
   async function init(){
     try{
-      // must have token & email (em)
       if(!token || !em){ msg('Link ist unvollständig.'); return; }
-      const r = await fetch(`/.netlify/functions/iban_ro?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`);
+
+      const payload = new URLSearchParams();
+      payload.set('id', id);
+      payload.set('token', token);
+      payload.set('em', em);
+      payload.set('lang', lang);
+
+      const r = await fetch(`/.netlify/functions/iban_ro`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/x-www-form-urlencoded', 'Accept':'application/json' },
+        body: payload.toString()
+      });
+
       if(!r.ok){ msg('Link ungültig oder abgelaufen.'); return; }
       const j = await r.json();
 

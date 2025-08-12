@@ -22,3 +22,10 @@
 [[scheduled.functions]]
   name = "batch-token"
   cron = "0 3 * * *"
+  
+[[redirects]]
+  from = "http://iban.sikuralife.com/*"
+  to   = "https://iban.sikuralife.com/:splat"
+  status = 301
+  force  = true
+

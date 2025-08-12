@@ -2,42 +2,59 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>IBAN Erhebung</title>
   <link rel="stylesheet" href="/styles.css"/>
 </head>
 <body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-strong">Sikura</span> <span class="brand-light">Life</span></div>
+    <div class="lang">
+      <select id="langSel" aria-label="Sprache">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+      </select>
+    </div>
+  </header>
+
   <main class="container">
-    <h1>IBAN Erhebung</h1>
-    <section aria-labelledby="ro-title">
-      <h2 id="ro-title">Ihre bereits erfassten Angaben</h2>
-      <div id="ro-list" class="readonly-grid"></div>
+    <h1 id="title"></h1>
+    <p class="subtitle" id="subtitle"></p>
+
+    <div class="notice" id="notice"></div>
+
+    <section class="panel">
+      <div class="grid" id="roGrid">
+        <!-- rows inserted dynamically -->
+      </div>
     </section>
 
-    <form id="ibanForm" style="display:none;" novalidate>
-      <input type="hidden" id="id">
-      <input type="hidden" id="token">
-      <input type="hidden" id="em">
-      <input type="hidden" id="lang">
-      <input type="hidden" id="email">
-
+    <form id="ibanForm" class="panel" novalidate>
       <div class="field">
-        <label for="iban">IBAN</label>
-        <input id="iban" name="iban" autocomplete="off" required inputmode="text" spellcheck="false" />
-        <div class="small">Bitte ohne Leerzeichen oder Sonderzeichen eingeben.</div>
+        <label for="iban" id="lblIban">IBAN</label>
+        <input id="iban" name="iban" required autocomplete="off" inputmode="text" spellcheck="false"/>
+        <small class="hint" id="hintIban"></small>
       </div>
 
       <div class="field">
-        <label for="iban_confirm">IBAN Bestätigung</label>
-        <input id="iban_confirm" name="iban_confirm" autocomplete="off" required inputmode="text" spellcheck="false" />
+        <label for="iban_confirm" id="lblIban2">IBAN Bestätigung</label>
+        <input id="iban_confirm" name="iban_confirm" required autocomplete="off" inputmode="text" spellcheck="false"/>
       </div>
 
-      <button type="submit" id="submitBtn">Senden</button>
-      <div id="msg" role="status" aria-live="polite"></div>
+      <input type="hidden" id="id"/>
+      <input type="hidden" id="token"/>
+      <input type="hidden" id="em"/>
+      <input type="hidden" id="email"/>
+      <input type="hidden" id="lang"/>
+
+      <div class="actions">
+        <button type="submit" id="btnSend"></button>
+      </div>
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
     </form>
 
-    <footer>© Sikura</footer>
+    <footer class="footer">© Sikura</footer>
   </main>
 
   <script src="/index.js" defer></script>

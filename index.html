@@ -1,61 +1,73 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IBAN Erhebung</title>
-  <link rel="stylesheet" href="/styles.css"/>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-strong">Sikura</span> <span class="brand-light">Life</span></div>
-    <div class="lang">
-      <select id="langSel" aria-label="Sprache">
-        <option value="de">Deutsch</option>
-        <option value="en">English</option>
-        <option value="it">Italiano</option>
-      </select>
+  <header class="site-header">
+    <div class="brand">
+      <img src="/siku_logo.png" alt="Sikura Life" class="logo">
+    </div>
+    <div class="lang-switch">
+      <label for="langSel" class="sr-only">Sprache</label>
+      <select id="langSel" class="select"></select>
     </div>
   </header>
 
   <main class="container">
-    <h1 id="title"></h1>
-    <p class="subtitle" id="subtitle"></p>
+    <h1 id="pageTitle"></h1>
+    <p class="muted" id="lead"></p>
 
-    <div class="notice" id="notice"></div>
+    <div class="note" id="note"></div>
 
-    <section class="panel">
-      <div class="grid" id="roGrid">
-        <!-- rows inserted dynamically -->
-      </div>
+    <section class="card">
+      <div class="grid" id="ro-list"></div>
     </section>
 
-    <form id="ibanForm" class="panel" novalidate>
-      <div class="field">
-        <label for="iban" id="lblIban">IBAN</label>
-        <input id="iban" name="iban" required autocomplete="off" inputmode="text" spellcheck="false"/>
-        <small class="hint" id="hintIban"></small>
+    <form id="ibanForm" class="card space-y" novalidate>
+      <input type="hidden" id="id">
+      <input type="hidden" id="token">
+      <input type="hidden" id="em">
+      <input type="hidden" id="email">
+
+      <div class="row">
+        <div class="col-8">
+          <label for="iban" id="lblIban"></label>
+          <input id="iban" name="iban" autocomplete="off" inputmode="text" class="input">
+          <small class="hint" id="ibanHint"></small>
+          <div id="ibanFeedback" class="feedback" aria-live="polite"></div>
+        </div>
+        <div class="col-4"></div>
       </div>
 
-      <div class="field">
-        <label for="iban_confirm" id="lblIban2">IBAN Bestätigung</label>
-        <input id="iban_confirm" name="iban_confirm" required autocomplete="off" inputmode="text" spellcheck="false"/>
+      <div class="row">
+        <div class="col-8">
+          <label for="iban_confirm" id="lblIban2"></label>
+          <input id="iban_confirm" name="iban_confirm" autocomplete="off" inputmode="text" class="input">
+          <div id="iban2Feedback" class="feedback" aria-live="polite"></div>
+        </div>
+        <div class="col-4"></div>
       </div>
 
-      <input type="hidden" id="id"/>
-      <input type="hidden" id="token"/>
-      <input type="hidden" id="em"/>
-      <input type="hidden" id="email"/>
-      <input type="hidden" id="lang"/>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="chkConfirm"><span id="lblChkConfirm"></span></label>
+        <label class="check"><input type="checkbox" id="chkGDPR"><span id="lblChkGDPR"></span> <a href="/privacy.html" target="_blank" rel="noopener" id="lblPrivacy">Privacy</a>.</label>
+      </div>
 
       <div class="actions">
-        <button type="submit" id="btnSend"></button>
+        <button type="submit" id="submitBtn" class="btn" disabled></button>
       </div>
-      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+      <p class="muted tiny" id="validityNote"></p>
+      <div id="msg" class="feedback"></div>
     </form>
-
-    <footer class="footer">© Sikura</footer>
   </main>
+
+  <footer class="site-footer">
+    <small>© Sikura</small>
+  </footer>
 
   <script src="/index.js" defer></script>
 </body>

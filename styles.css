@@ -1,17 +1,36 @@
-
-/* styles.css */
-body {
-  font-family: Arial, sans-serif;
-  max-width: 800px;
-  margin: auto;
-  padding: 20px;
+:root{
+  --bg:#f7f8fa;
+  --panel:#fff;
+  --text:#0f172a;
+  --muted:#64748b;
+  --primary:#2563eb;
+  --primary-600:#1d4ed8;
+  --border:#e2e8f0;
+  --radius:12px;
 }
-h1 {
-  color: #333;
-}
-label {
-  font-weight: bold;
-}
-input[readonly] {
-  background-color: #f9f9f9;
-}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+.brand{font-weight:700;font-size:22px}
+.brand-strong{color:#7c3aed}
+.brand-light{color:#eab308;font-weight:600;margin-left:6px}
+.container{max-width:820px;margin:28px auto;padding:0 16px}
+h1{font-size:28px;margin:0 0 8px}
+.subtitle{color:var(--muted);margin:0 0 16px}
+.notice{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;padding:10px 12px;border-radius:var(--radius);margin-bottom:16px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.ro{display:flex;flex-direction:column;gap:6px}
+.ro label{font-size:12px;color:var(--muted)}
+.ro input{border:1px solid var(--border);border-radius:10px;padding:10px;background:#f8fafc;color:#0f172a}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font-weight:600}
+.field input{border:1px solid var(--border);border-radius:10px;padding:12px;background:#fff}
+.hint{color:var(--muted);font-size:12px}
+.actions{margin-top:8px}
+button{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-weight:600;cursor:pointer}
+button:hover{background:var(--primary-600)}
+.footer{color:var(--muted);font-size:12px;margin:16px 0}
+.msg{margin-top:8px;color:#b91c1c}
+select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}

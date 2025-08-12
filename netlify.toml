@@ -1,5 +1,5 @@
 [build]
-  publish = "public"
+  publish = "."
   functions = "netlify/functions"
 
 [functions]
@@ -15,11 +15,10 @@
     X-Frame-Options = "DENY"
     Permissions-Policy = "interest-cohort=()"
 
-# Scheduled Functions
 [[scheduled.functions]]
   name = "cleanup"
-  cron = "30 2 * * *"   # taeglich 02:30 UTC
+  cron = "30 2 * * *"
 
 [[scheduled.functions]]
   name = "batch-token"
-  cron = "0 3 * * *"    # optional: taeglich 03:00 UTC
+  cron = "0 3 * * *"

@@ -28,7 +28,8 @@ export const handler = async (event) => {
     }
 
     // Admin-Token Check
-    const token = event.headers["x-admin-token"] || event.headers["X-Admin-Token"];
+    const qs = new URLSearchParams(event.rawQuery || event.queryStringParameters || {});
+const token = (event.headers["x-admin-token"] || event.headers["X-Admin-Token"] || qs.get("admin_token"));
     if (!token || token !== process.env.ADMIN_EXPORT_TOKEN) {
       return { statusCode: 401, body: "UNAUTHORIZED" };
     }

@@ -1,4 +1,4 @@
-// netlify/functions/iban_submit.js
+// netlify/functions/verify_submit.js
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
@@ -97,7 +97,7 @@ exports.handler = async (event) => {
 
     // 2) Pflicht-Validierungen (ID/Token)
     const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
-    const tokenVerify   = (theProps['token_iban'] || '').toString().trim();
+    const tokenVerify   = (theProps['token_verify'] || '').toString().trim();
 
     if (glaeubigerVal !== String(id).trim()) {
       return { statusCode: 403, body: 'ID mismatch' };
@@ -106,16 +106,16 @@ exports.handler = async (event) => {
       return { statusCode: 403, body: 'Invalid token' };
     }
 
-    // 3) One-Time-Use prüfen (token_iban_used_at)
-    const tokenUsedAt = (theProps['token_iban_used_at'] || '').toString().trim();
+    // 3) One-Time-Use prüfen (token_verify_used_at)
+    const tokenUsedAt = (theProps['token_verify_used_at'] || '').toString().trim();
     if (ENFORCE_SINGLE_USE && tokenUsedAt) {
       return { statusCode: 409, body: 'Token already used' };
     }
 
-    // 4) Ablauf prüfen (token_iban_expiry bevorzugt, Fallbacks möglich)
+    // 4) Ablauf prüfen (Token_verify_expiry bevorzugt, Fallbacks möglich)
     const expiryRaw =
-      theProps['token_iban_expiry'] ||
-      theProps['token_iban_expiry'] ||
+      theProps['Token_verify_expiry'] ||
+      theProps['token_verify_expiry'] ||
       theProps['token_expiry'] ||
       '';
     if (ENFORCE_EXPIRY && expiryRaw) {
@@ -145,9 +145,9 @@ exports.handler = async (event) => {
     setIf('agent_verify',     userAgent);
 
     // One-Time-Use markieren & Token/Ablauf leeren
-    set('token_iban_used_at', nowISO);
-    set('token_iban',  '');
-    set('token_iban_expiry', '');
+    set('token_verify_used_at', nowISO);
+    set('token_verify',  '');
+    set('Token_verify_expiry', '');
 
     // 6) Mailjet-Update
     const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {

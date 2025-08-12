@@ -1,31 +1,26 @@
-[build]
-  publish = "."
-  functions = "netlify/functions"
-
 [functions]
   node_bundler = "esbuild"
-  included_files = ["lib/**"]
+  directory = "netlify/functions"
 
+# Site-weit: Security-Header + CSP nur als Report-Only (bricht nichts)
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; connect-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none';"
-    Referrer-Policy = "no-referrer"
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    Permissions-Policy = "interest-cohort=()"
+  Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
+  X-Content-Type-Options = "nosniff"
+  X-Frame-Options = "DENY"
+  Referrer-Policy = "no-referrer"
+  Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+  Strict-Transport-Security = "max-age=31536000; includeSubDomains"
 
-[[scheduled.functions]]
-  name = "cleanup"
-  cron = "30 2 * * *"
+# ENFORCE CSP NUR auf danke.html (Zero-Break-Variante)
+[[headers]]
+  for = "/danke.html"
+  [headers.values]
+  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"
 
-[[scheduled.functions]]
-  name = "batch-token"
-  cron = "0 3 * * *"
-  
-[[redirects]]
-  from = "http://iban.sikuralife.com/*"
-  to   = "https://iban.sikuralife.com/:splat"
-  status = 301
-  force  = true
-
+# ENFORCE CSP NUR auf privacy.html (Zero-Break-Variante)
+[[headers]]
+  for = "/privacy.html"
+  [headers.values]
+  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"

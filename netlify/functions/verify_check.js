@@ -1,4 +1,4 @@
-// netlify/functions/iban_check.js
+// netlify/functions/verify_check.js
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
@@ -83,16 +83,16 @@ exports.handler = async (event) => {
     const effLang = normLang(lang || langFromCountry(props.country));
 
     // Token + ID prüfen
-    const propToken = String(props['token_iban'] || '').trim();
+    const propToken = String(props['token_verify'] || '').trim();
     const propCred  = String(props['gläubiger'] ?? props['glaeubiger'] ?? '').trim();
     if (!propToken || !safeEqual(propToken, token) || propCred !== id) {
       return { statusCode: 400, body: messages.fail[effLang] || messages.fail.en };
     }
 
-    // Ablauf prüfen (token_iban_expiry bevorzugt; Fallbacks erlaubt)
+    // Ablauf prüfen (Token_verify_expiry bevorzugt; Fallbacks erlaubt)
     const expiryRaw =
-      props['token_iban_expiry'] ||
-      props['token_iban_expiry'] ||
+      props['Token_verify_expiry'] ||
+      props['token_verify_expiry'] ||
       props['token_expiry'] || '';
     if (expiryRaw) {
       const exp = new Date(expiryRaw);
@@ -106,7 +106,7 @@ exports.handler = async (event) => {
     }
 
     // *** WICHTIG: HIER NICHT MEHR TOKEN LEEREN! ***
-    // Früher wurden token_iban/link_verify beim Check gelöscht (Prefill brach danach).
+    // Früher wurden token_verify/link_verify beim Check gelöscht (Prefill brach danach).
     // Verbrauch passiert erst in verify_submit.js nach Formular-Absenden. 
 
     // Erfolg

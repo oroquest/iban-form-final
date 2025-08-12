@@ -1,4 +1,4 @@
-// netlify/functions/send_iban_email.js
+// netlify/functions/send_verify_email.js
 // Mailversand ohne Mailjet-SDK – direkte v3.1 REST API via native fetch
 
 exports.handler = async (event) => {
@@ -18,12 +18,12 @@ exports.handler = async (event) => {
     const MJ_PRIVATE = env("MJ_APIKEY_PRIVATE");
     const MAIL_FROM_ADDRESS = env("MAIL_FROM_ADDRESS");
     const MAIL_FROM_NAME    = env("MAIL_FROM_NAME");
-    const BASE_IBAN_URL   = env("BASE_IBAN_URL");   // z.B. https://verify.sikuralife.com
-    const URL_ISSUE_IBAN_TOKEN   = env("URL_ISSUE_IBAN_TOKEN");   // z.B. https://iban.sikuralife.com/.netlify/functions/issue_iban_token
-    const TPL_DE_DIRECT     = Number(env("TEMPLATE_DE_IBAN_DIRECT"));
-    const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_IBAN_LAWYER"));
-    const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_IBAN_DIRECT"));
-    const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_IBAN_LAWYER"));
+    const BASE_VERIFY_URL   = env("BASE_VERIFY_URL");   // z.B. https://verify.sikuralife.com
+    const URL_ISSUE_TOKEN   = env("URL_ISSUE_TOKEN");   // z.B. https://verify.sikuralife.com/.netlify/functions/issue_token
+    const TPL_DE_DIRECT     = Number(env("TEMPLATE_DE_DIRECT"));
+    const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_LAWYER"));
+    const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_DIRECT"));
+    const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_LAWYER"));
     const INTERNAL_KEY      = env("GET_CONTACT_INTERNAL_KEY"); // ← NEU: interner Key für get_contact
 
     const { email, id, lang, category } = JSON.parse(event.body || "{}");
@@ -33,7 +33,7 @@ exports.handler = async (event) => {
 
     // --- 1) Kontakt holen (mit internem Key) ---
     const contactRes = await fetch(
-      `${BASE_IBAN_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`,
+      `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`,
       { headers: { "x-internal-key": INTERNAL_KEY } } // ← NEU: Header mitschicken
     );
     if (!contactRes.ok) {
@@ -53,7 +53,7 @@ exports.handler = async (event) => {
     const prefCat  = (category || contact.Category || "").toUpperCase();
 
     // --- 2) Token ausstellen ---
-    const tokenRes = await fetch(URL_ISSUE_IBAN_TOKEN, {
+    const tokenRes = await fetch(URL_ISSUE_TOKEN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, id, lang: prefLang })
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
 
     // --- 4) Mailjet v3.1 Send ---
     const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
-    const subject = (prefLang === "de") ? "IBAN-Erfassung" : "Provide your IBAN";
+    const subject = (prefLang === "de") ? "Verifizierung Ihrer Daten" : "Verify your contact details";
 
     const payload = {
       Messages: [{

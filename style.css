@@ -41,3 +41,22 @@ button {
 .checkbox-group {
   margin-top: 1rem;
 }
+
+.checkbox-line {
+  display: block;
+  margin-top: 1rem;
+}
+.checkbox-line input[type="checkbox"] {
+  margin-right: 0.5rem;
+  vertical-align: top;
+}
+
+.checkbox-group {
+  margin-top: 1rem;
+  text-align: center;
+}
+.checkbox-group label {
+  display: inline-block;
+  max-width: 500px;
+  text-align: left;
+}

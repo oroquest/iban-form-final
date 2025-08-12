@@ -1,24 +1,30 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8"/>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>IBAN Erhebung</title>
-  <link rel="stylesheet" href="/styles.css"/>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>IBAN Erhebung</title>
+<link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
   <main class="container">
     <h1>IBAN Erhebung</h1>
-    <section id="ro" aria-labelledby="ro-title">
-      <h2 id="ro-title">Ihre bereits erfassten Angaben</h2>
+    <section>
+      <h2>Ihre bereits erfassten Angaben</h2>
       <div id="ro-list" class="readonly-grid"></div>
     </section>
-    <form id="ibanForm" style="display:none;" novalidate>
-      <input type="hidden" id="id"><input type="hidden" id="token"><input type="hidden" id="em"><input type="hidden" id="lang"><input type="hidden" id="email">
-      <div class="field"><label for="iban">IBAN</label><input id="iban" name="iban" autocomplete="off" required inputmode="text" spellcheck="false" /><small class="hint">Bitte ohne Leerzeichen oder Sonderzeichen eingeben.</small></div>
-      <div class="field"><label for="iban_confirm">IBAN Bestätigung</label><input id="iban_confirm" name="iban_confirm" autocomplete="off" required inputmode="text" spellcheck="false" /></div>
-      <button type="submit" id="submitBtn">Senden</button><div id="msg" role="status" aria-live="polite"></div>
+    <form id="ibanForm" style="display:none" novalidate>
+      <input type="hidden" id="email">
+      <div class="field">
+        <label for="iban">IBAN</label>
+        <input id="iban" required>
+      </div>
+      <div class="field">
+        <label for="iban_confirm">IBAN Bestätigung</label>
+        <input id="iban_confirm" required>
+      </div>
+      <button type="submit">Senden</button>
+      <div id="msg" role="status" aria-live="polite"></div>
     </form>
   </main>
   <script src="/iban.js" defer></script>

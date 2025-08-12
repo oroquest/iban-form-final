@@ -1,0 +1,25 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["lib/**"]
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; connect-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none';"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "interest-cohort=()"
+
+# Scheduled Functions
+[[scheduled.functions]]
+  name = "cleanup"
+  cron = "30 2 * * *"   # taeglich 02:30 UTC
+
+[[scheduled.functions]]
+  name = "batch-token"
+  cron = "0 3 * * *"    # optional: taeglich 03:00 UTC

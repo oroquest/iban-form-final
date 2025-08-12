@@ -1,56 +1,105 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura IBAN Formular</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Sikura – IBAN Eingabe</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;margin:0}
+    .container{max-width:760px;margin:32px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    .row{display:flex;gap:16px}
+    label{display:block;margin:12px 0 6px;font-weight:600}
+    input[type="text"],input[type="checkbox"]{padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;width:100%}
+    .hint{color:#6b7280;font-size:14px;margin-top:6px}
+    .error{background:#fee2e2;color:#991b1b;padding:12px;border-radius:10px;margin:12px 0;display:none}
+    .success{background:#e7f3e7;color:#14532d;padding:12px;border-radius:10px;margin:12px 0;display:none}
+    button{background:#111827;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+  </style>
 </head>
 <body>
   <div class="container">
-    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
-    <form name="iban-form" method="POST" data-netlify="true" action="danke.html" id="iban-form">
-      <div class="language-switcher">
-        <label for="language"><strong>Language:</strong></label>
-        <select id="language" onchange="setLanguage(this.value)">
-          <option value="de">Deutsch</option>
-          <option value="it">Italiano</option>
-          <option value="en">English</option>
-        </select>
-      </div>
-      <h2 data-i18n="title">Bitte bestätigen Sie Ihre IBAN</h2>
+    <h1>IBAN sicher uebermitteln</h1>
+    <p class="hint">Bitte ohne Leerzeichen eingeben. Wir speichern Ihre IBAN verschluesselt. Es werden keine Voll‑IBANs per E‑Mail versendet.</p>
 
-      <label for="iban" data-i18n="iban">IBAN</label>
-      <input type="text" id="iban" name="iban" required />
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
 
-      <label for="address" data-i18n="address">Aktuelle Adresse</label>
-      <input type="text" id="address" name="address" required />
+    <form id="ibanForm">
+      <label for="iban">IBAN</label>
+      <input id="iban" name="iban" type="text" placeholder="z. B. CH9300762011623852957" autocomplete="off" required />
 
-      <label for="contract" data-i18n="contract">Vertragsnummer</label>
-      <input type="text" id="contract" name="contract" required />
+      <label for="iban2">IBAN bestaetigen</label>
+      <input id="iban2" name="ibanConfirm" type="text" placeholder="nochmals eingeben" autocomplete="off" required />
 
-      <label for="passport" data-i18n="passport">Passnummer (optional)</label>
-      <input type="text" id="passport" name="passport" />
+      <label for="contactId">Kontakt-ID</label>
+      <input id="contactId" name="contactId" type="text" placeholder="z. B. 7d7b8f5e-..." required />
 
-      <label for="lei" data-i18n="lei">LEI (optional für juristische Personen)</label>
-      <input type="text" id="lei" name="lei" />
-
-      <label for="note" data-i18n="note">Betreff / Bemerkungen</label>
-      <textarea id="note" name="note"></textarea>
-
-      <div class="checkbox-group">
-        <label><input type="checkbox" name="confirm" required />
-        <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind und meine aktuellen Bankdaten widerspiegeln.</span></label>
-      </div>
-      <div class="checkbox-group">
-        <label><input type="checkbox" name="privacy" required />
-        <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+      <div style="margin:12px 0">
+        <label style="display:flex;align-items:center;gap:10px">
+          <input id="consent" type="checkbox" required />
+          <span>Ich willige in die zweckgebundene Verarbeitung meiner IBAN ein.</span>
+        </label>
+        <div class="hint">Ihre IBAN wird ausschliesslich fuer die Zahlungsabwicklung verwendet und verschluesselt gespeichert.</div>
       </div>
 
-      <button type="submit" data-i18n="submit">Absenden</button>
+      <button id="submitBtn" type="submit">Sicher uebermitteln</button>
     </form>
   </div>
+
+<script type="module">
+const $ = (id)=>document.getElementById(id);
+const error = $("error"), success = $("success"), btn = $("submitBtn");
+
+function normalizeIban(v){return v.replace(/\s+/g,"").toUpperCase()}
+function basicCheck(iban){
+  const v = normalizeIban(iban);
+  if (v.length < 15 || v.length > 34) return false;
+  if (!/^([A-Z]{2}\d{2}[0-9A-Z]+)$/.test(v)) return false;
+  if (!v.startsWith("CH")) return false; // Phase 1: nur CH
+  return true;
+}
+
+$("iban").addEventListener("input", e => { e.target.value = normalizeIban(e.target.value) })
+$("iban2").addEventListener("input", e => { e.target.value = normalizeIban(e.target.value) })
+
+$("ibanForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  error.style.display="none"; success.style.display="none";
+
+  const iban = normalizeIban($("iban").value);
+  const ibanConfirm = normalizeIban($("iban2").value);
+  const contactId = $("contactId").value.trim();
+  const consent = $("consent").checked;
+
+  if (!basicCheck(iban)) { error.textContent="Die IBAN wirkt ungueltig (Format/Laenge/Land)."; error.style.display="block"; return; }
+  if (iban !== ibanConfirm) { error.textContent="Die beiden IBAN-Eingaben stimmen nicht ueberein."; error.style.display="block"; return; }
+  if (!consent) { error.textContent="Bitte Zustimmung erteilen."; error.style.display="block"; return; }
+
+  btn.disabled = true;
+
+  try {
+    const idempotencyKey = crypto.randomUUID();
+    const res = await fetch("/.netlify/functions/iban-submit", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "X-Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify({ contactId, iban, ibanConfirm, consent })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "SERVER_ERROR");
+    success.textContent = "IBAN sicher empfangen. Vielen Dank.";
+    success.style.display="block";
+    $("iban").value = ""; $("iban2").value="";
+  } catch (err){
+    error.textContent = "Fehler: " + err.message;
+    error.style.display="block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
 </body>
 </html>

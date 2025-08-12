@@ -1,7 +1,4 @@
-//
-// /iban.js updated to use iban_ro proxy (validates token, then fetches get_contact server-side)
-//
-
+// /iban.js (Frontend) — now calls iban_ro server proxy
 (function(){
   const qs = new URLSearchParams(location.search);
   const id    = qs.get('id')||'';

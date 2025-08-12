@@ -1,6 +1,7 @@
 // netlify/functions/iban_ro.js
-// Server-side proxy to fetch readonly customer data via internal get_contact function,
-// but ONLY after validating the IBAN token. This avoids exposing the internal key to the browser.
+// Server-side proxy that validates IBAN token via Mailjet, then tries to fetch
+// full contact data from internal get_contact using x-internal-key.
+// If get_contact fails (403/404/500), we gracefully fall back to Mailjet props.
 
 let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
 if (!fetchImpl) { fetchImpl = require('node-fetch'); }
@@ -10,11 +11,13 @@ const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-const INTERNAL_KEY = process.env.GET_CONTACT_INTERNAL_KEY;
-const BASE_URL     = process.env.BASE_PUBLIC_URL || '';
+const ENFORCE_EXPIRY = true;
+const BASE_URL = process.env.BASE_PUBLIC_URL || 'https://iban.sikuralife.com';
+const INTERNAL_KEY = process.env.GET_CONTACT_INTERNAL_KEY || '';
 
 function b64urlDecode(s){ if(!s) return ''; s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; try {return Buffer.from(s,'base64').toString('utf8')}catch{return ''} }
 function normalizePairs(arr){ return Object.fromEntries((arr||[]).map(p=>[p.Name, p.Value])); }
+const jres = (code, obj) => ({ statusCode: code, headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) });
 
 async function mjGetContactIdByEmail(email) {
   const r = await fetchFn(`https://api.mailjet.com/v3/REST/contact/?ContactEmail=${encodeURIComponent(email)}`, {
@@ -30,53 +33,79 @@ async function mjGetContactIdByEmail(email) {
 exports.handler = async (event) => {
   try {
     const q = event.queryStringParameters || {};
-    let { id, token, em, email } = q;
+    let { id, token, em, email, lang } = q;
     if(!email && em) email = b64urlDecode(em).trim();
-    if(!email || !token) return { statusCode:400, body:'Missing token/email' };
-    if(!INTERNAL_KEY) return { statusCode:500, body:'Missing ENV GET_CONTACT_INTERNAL_KEY' };
-    if(!BASE_URL) return { statusCode:500, body:'Missing ENV BASE_PUBLIC_URL' };
+    if(!email || !token) return jres(400, { ok:false, error:'Missing token/email' });
 
-    // Validate token using Mailjet contactdata (IBAN)
+    // 1) Mailjet: fetch contact props & validate token
     const contactId = await mjGetContactIdByEmail(email);
     const r = await fetchFn(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(contactId)}`, {
       headers:{ Authorization: mjAuth }
     });
-    if(!r.ok){ const t = await r.text(); return { statusCode:502, body:`Mailjet fetch failed: ${t}` }; }
+    if(!r.ok){ const t = await r.text(); return jres(502, { ok:false, error:`Mailjet fetch failed: ${t}` }); }
+
     const j = await r.json();
     const props = normalizePairs(j?.Data?.[0]?.Data);
-
     const tokenStored = String(props.token_iban||'');
     const expiryRaw   = String(props.token_iban_expiry||props.Token_iban_expiry||'');
 
-    if(!tokenStored) return { statusCode:401, body:'Token missing' };
-    if(tokenStored !== String(token)) return { statusCode:401, body:'Token mismatch' };
-    if(expiryRaw){
+    if(!tokenStored) return jres(401, { ok:false, error:'Token missing' });
+    if(tokenStored !== String(token)) return jres(401, { ok:false, error:'Token mismatch' });
+    if(ENFORCE_EXPIRY && expiryRaw){
       const exp = new Date(expiryRaw);
-      if(isFinite(exp) && exp < new Date()) return { statusCode:410, body:'Token expired' };
+      if(isFinite(exp) && exp < new Date()) return jres(410, { ok:false, error:'Token expired' });
     }
 
-    // After validation, call internal get_contact
-    const url = `${BASE_URL}/.netlify/functions/get_contact?id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}`;
-    const gc = await fetchFn(url, { headers: { 'x-internal-key': INTERNAL_KEY } });
-    if (!gc.ok) {
-      const t = await gc.text();
-      // Fallback to props if internal endpoint denies
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ok:true, email, id, readonly: {}, props_all: props, note: `fallback_props_all (get_contact: ${gc.status})` })
-      };
+    // 2) Try internal get_contact (GET first, then POST) with x-internal-key
+    let readonly = null;
+    let raw = null;
+    if (INTERNAL_KEY) {
+      // GET
+      try {
+        const url = `${BASE_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}&id=${encodeURIComponent(id||'')}`;
+        const g = await fetchFn(url, { headers: { 'x-internal-key': INTERNAL_KEY, 'accept':'application/json' } });
+        if (g.ok) {
+          raw = await g.json().catch(()=>null);
+        } else {
+          // POST fallback
+          const p = await fetchFn(`${BASE_URL}/.netlify/functions/get_contact`, {
+            method:'POST',
+            headers: { 'x-internal-key': INTERNAL_KEY, 'content-type': 'application/json', 'accept':'application/json' },
+            body: JSON.stringify({ email, id })
+          });
+          if (p.ok) raw = await p.json().catch(()=>null);
+        }
+      } catch (e) {
+        // ignore, we'll fall back
+      }
     }
-    const data = await gc.json().catch(()=>null);
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok:true, email, id, readonly: data||{}, props_all: props })
-    };
+
+    if (raw && typeof raw === 'object') {
+      // try to map a few likely shapes
+      if (raw.readonly && typeof raw.readonly === 'object') readonly = raw.readonly;
+      else if (raw.data && typeof raw.data === 'object') readonly = raw.data;
+      else readonly = raw;
+    }
+
+    // 3) Fallback: derive readonly from Mailjet props
+    if (!readonly) {
+      readonly = {};
+      for (const [k,v] of Object.entries(props)) {
+        const low = k.toLowerCase();
+        if (low.includes('token')) continue;
+        if (low.includes('iban')) continue;
+        if (low.startsWith('ip_') || low.startsWith('agent_')) continue;
+        if (v == null || typeof v === 'object') continue;
+        readonly[k] = String(v);
+      }
+    }
+
+    return jres(200, { ok:true, email, id, readonly, props_all: props });
+
   } catch (err) {
     const debug = process.env.DEBUG === '1';
     return debug
-      ? { statusCode:500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:String(err?.message||err) }) }
-      : { statusCode:500, body:'Server error' };
+      ? jres(500, { ok:false, error:String(err?.message||err) })
+      : { statusCode: 500, body: 'Server error' };
   }
 };

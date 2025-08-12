@@ -1,4 +1,7 @@
-// /iban.js (Frontend)
+//
+// /iban.js updated to use iban_ro proxy (validates token, then fetches get_contact server-side)
+//
+
 (function(){
   const qs = new URLSearchParams(location.search);
   const id    = qs.get('id')||'';
@@ -27,7 +30,7 @@
 
   async function init(){
     try{
-      const r = await fetch(`/.netlify/functions/iban_check?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`);
+      const r = await fetch(`/.netlify/functions/iban_ro?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}&lang=${encodeURIComponent(lang)}`);
       if(!r.ok){ msg('Link ungültig oder abgelaufen.'); return; }
       const j = await r.json();
 

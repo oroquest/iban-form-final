@@ -1,5 +1,4 @@
 // netlify/functions/iban_check.js
-
 let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
 if (!fetchImpl) { fetchImpl = require('node-fetch'); }
 const fetchFn = (...args) => fetchImpl(...args);
@@ -8,15 +7,7 @@ const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-
 function jres(code, obj){ return { statusCode: code, headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) }; }
-function dbg(code, err){
-  if(process.env.DEBUG==='1'){
-    return jres(code, { ok:false, error:String(err && err.message || err), stack:String(err && err.stack || '') });
-  }
-  return { statusCode: code, body: 'Server error' };
-}
-
 
 const ENFORCE_EXPIRY = (process.env.ENFORCE_EXPIRY||'0') === '1';
 
@@ -42,12 +33,13 @@ exports.handler = async (event)=>{
   try{
     const { q, b } = parse(event);
     let id = normVal(q.id, b.id);
-    let token = normVal(q.token, b.token);
+    let token = (normVal(q.token, b.token)||'').trim();
     let em = normVal(q.em, b.em);
     let email = normVal(q.email, b.email);
     const lang = (normVal(q.lang, b.lang)||'de').toLowerCase();
 
     if(!email && em) email = b64urlDecode(em) || em;
+
     if(!email || !token) return jres(400, { ok:false, error:'Missing token/email', got:{ query:q, body:b } });
 
     const contactId = await mjGetContactIdByEmail(email);
@@ -56,11 +48,16 @@ exports.handler = async (event)=>{
     const j = await r.json();
     const props = toObj(j?.Data?.[0]?.Data);
 
-    const tokenStored = String(props.token_iban||'');
-    const expiryRaw   = String(props.token_iban_expiry||props.Token_iban_expiry||'');
+    const tokenStored = String(props.token_iban||'').trim();
+    const expiryRaw   = String(props.token_iban_expiry||props.Token_iban_expiry||'').trim();
 
     if(!tokenStored) return jres(401, { ok:false, error:'Token missing' });
-    if(tokenStored !== String(token)) return jres(401, { ok:false, error:'Token mismatch' });
+    if(tokenStored !== token){
+      if(process.env.DEBUG==='1'){
+        return jres(401, { ok:false, error:'Token mismatch', got:{ token }, stored:{ tokenStored, expiryRaw } });
+      }
+      return jres(401, { ok:false, error:'Token mismatch' });
+    }
     if(ENFORCE_EXPIRY && expiryRaw){ const exp=safeDate(expiryRaw); if(exp && exp < new Date()) return jres(410, { ok:false, error:'Token expired' }); }
 
     const readonly={};
@@ -68,6 +65,9 @@ exports.handler = async (event)=>{
 
     return jres(200, { ok:true, email, id, readonly, props_all: props });
   }catch(err){
-    return dbg(500, err);
+    if(process.env.DEBUG==='1'){
+      return jres(500, { ok:false, error:String(err && err.message || err) });
+    }
+    return { statusCode:500, body:'Server error' };
   }
 };

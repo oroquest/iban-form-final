@@ -1,62 +1,17 @@
 <!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>IBAN Erhebung</title>
-  <link rel="stylesheet" href="/styles.css"/>
-</head>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IBAN Erhebung</title><link rel="stylesheet" href="/styles.css"></head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-strong">Sikura</span> <span class="brand-light">Life</span></div>
-    <div class="lang">
-      <select id="langSel" aria-label="Sprache">
-        <option value="de">Deutsch</option>
-        <option value="en">English</option>
-        <option value="it">Italiano</option>
-      </select>
-    </div>
-  </header>
-
-  <main class="container">
-    <h1 id="title"></h1>
-    <p class="subtitle" id="subtitle"></p>
-
-    <div class="notice" id="notice"></div>
-
-    <section class="panel">
-      <div class="grid" id="roGrid">
-        <!-- rows inserted dynamically -->
-      </div>
-    </section>
-
-    <form id="ibanForm" class="panel" novalidate>
-      <div class="field">
-        <label for="iban" id="lblIban">IBAN</label>
-        <input id="iban" name="iban" required autocomplete="off" inputmode="text" spellcheck="false"/>
-        <small class="hint" id="hintIban"></small>
-      </div>
-
-      <div class="field">
-        <label for="iban_confirm" id="lblIban2">IBAN Bestätigung</label>
-        <input id="iban_confirm" name="iban_confirm" required autocomplete="off" inputmode="text" spellcheck="false"/>
-      </div>
-
-      <input type="hidden" id="id"/>
-      <input type="hidden" id="token"/>
-      <input type="hidden" id="em"/>
-      <input type="hidden" id="email"/>
-      <input type="hidden" id="lang"/>
-
-      <div class="actions">
-        <button type="submit" id="btnSend"></button>
-      </div>
-      <div id="msg" class="msg" role="status" aria-live="polite"></div>
-    </form>
-
-    <footer class="footer">© Sikura</footer>
-  </main>
-
-  <script src="/index.js" defer></script>
-</body>
-</html>
+<header class="site-header"><img src="/siku_logo.png" alt="Sikura" class="logo"><select id="langSel"><option value="de">Deutsch</option><option value="en">English</option><option value="it">Italiano</option></select></header>
+<main class="container">
+  <h1>IBAN Erhebung</h1>
+  <div id="msg" class="feedback"></div>
+  <section class="card"><div class="grid" id="ro-list"></div></section>
+  <form id="ibanForm" class="card" style="display:none">
+    <input type="hidden" id="id"><input type="hidden" id="token"><input type="hidden" id="em"><input type="hidden" id="email">
+    <label>IBAN</label><input id="iban" class="input"><small class="hint">Ohne Leerzeichen.</small>
+    <label>IBAN Bestätigung</label><input id="iban_confirm" class="input">
+    <button class="btn" id="submitBtn" type="submit">Senden</button>
+  </form>
+</main>
+<script src="/index.js" defer></script></body></html>

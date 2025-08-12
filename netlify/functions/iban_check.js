@@ -1,118 +1,81 @@
 // netlify/functions/iban_check.js
+let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
+if (!fetchImpl) { fetchImpl = require('node-fetch'); }
+const fetchFn = (...args) => fetchImpl(...args);
+
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-// Testmodus: '1' = abgelaufene Tokens werden nicht blockiert, nur Warnhinweis
-const TEST_MODE = process.env.VERIFY_TEST_MODE === '1';
+const ENFORCE_EXPIRY = true;
 
-// ---- Helpers ----
-const ALLOWED_LANG = new Set(['de','it','en']);
-const normLang = (s) => ALLOWED_LANG.has((s||'').toLowerCase()) ? s.toLowerCase() : 'de';
-const isValidId = (s) => /^[0-9]{1,10}$/.test(String(s||''));
-const isValidToken = (s) => /^[A-Za-z0-9\-_]{8,128}$/.test(String(s||''));
-const safeEqual = (a,b) => {
-  const A = Buffer.from(String(a||''), 'utf8');
-  const B = Buffer.from(String(b||''), 'utf8');
-  if (A.length !== B.length) return false;
-  return require('crypto').timingSafeEqual(A,B);
-};
-function b64urlDecode(input) {
-  if (!input) return '';
-  let s = String(input).replace(/-/g, '+').replace(/_/g, '/');
-  while (s.length % 4 !== 0) s += '=';
-  try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
-}
-function langFromCountry(country) {
-  const c = (country || '').toUpperCase();
-  if (c === 'CH' || c === 'DE' || c === 'AT' || c === 'LI') return 'de';
-  if (c === 'IT') return 'it';
-  return 'en';
+function b64urlDecode(s){ if(!s) return ''; s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; try {return Buffer.from(s,'base64').toString('utf8')}catch{return ''} }
+function normalizePairs(arr){ return Object.fromEntries((arr||[]).map(p=>[p.Name, p.Value])); }
+
+async function mjGetContactIdByEmail(email) {
+  const r = await fetchFn(`https://api.mailjet.com/v3/REST/contact/?ContactEmail=${encodeURIComponent(email)}`, {
+    headers: { Authorization: mjAuth }
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(`Mailjet contact fetch failed: ${r.status} ${t}`); }
+  const j = await r.json();
+  const id = j?.Data?.[0]?.ID;
+  if (!id) throw new Error(`Mailjet contact not found for ${email}`);
+  return id;
 }
 
-const messages = {
-  success: {
-    de: "OK",
-    it: "OK",
-    en: "OK"
-  },
-  fail: {
-    de: "❌ Ungültiger oder abgelaufener Verifizierungslink.",
-    it: "❌ Link di verifica non valido o scaduto.",
-    en: "❌ Invalid or expired verification link."
-  },
-  warn: {
-    de: "⚠ Hinweis: Der Link ist älter als die zulässige Gültigkeit. (Testmodus – keine Sperre)\n\n",
-    it: "⚠ Avviso: Il link è più vecchio della validità consentita. (Modalità test – nessun blocco)\n\n",
-    en: "⚠ Notice: The link is older than the allowed validity. (Test mode – no blocking)\n\n"
-  }
-};
-
-// ---- Handler ----
 exports.handler = async (event) => {
-  const q = event.queryStringParameters || {};
+  try{
+    const q = event.queryStringParameters || {};
+    let { id, token, em, email } = q;
+    if(!email && em) email = b64urlDecode(em).trim();
+    if(!email || !token) return { statusCode:400, body:'Missing token/email' };
 
-  // aus dem Link: /?lang=de&id=<glaeubigerId>&token=<hex>&em=<b64url(email)>
-  const lang   = normLang(q.lang || '');
-  const id     = String(q.id || '').trim();
-  const token  = String(q.token || '').trim();
-  const emRaw  = String(q.em || '').trim();
-  const email  = b64urlDecode(emRaw).trim().toLowerCase();
+    const contactId = await mjGetContactIdByEmail(email);
 
-  // Eingabevalidierung
-  if (!email || !isValidToken(token) || !isValidId(id)) {
-    return { statusCode: 400, body: messages.fail[lang] || messages.fail.en };
-  }
-
-  try {
-    // Kontakt-Properties aus Mailjet lesen
-    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      headers: { Authorization: mjAuth }
+    const r = await fetchFn(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(contactId)}`, {
+      headers:{ Authorization: mjAuth }
     });
-    if (!resp.ok) {
-      const t = await resp.text().catch(()=>'');
-      return { statusCode: 502, body: `Mailjet fetch failed: ${t}` };
-    }
+    if(!r.ok){ const t = await r.text(); return { statusCode:502, body:`Mailjet fetch failed: ${t}` }; }
 
-    const body = await resp.json();
-    const rows = body.Data || [];
-    const dataList = rows[0]?.Data || [];
-    const props = Object.fromEntries(dataList.map(d => [d.Name, d.Value]));
+    const j = await r.json();
+    const props = normalizePairs(j?.Data?.[0]?.Data);
 
-    // Sprache ggf. aus Country ableiten
-    const effLang = normLang(lang || langFromCountry(props.country));
-
-    // Token + ID prüfen
-    const propToken = String(props['token_iban'] || '').trim();
-    const propCred  = String(props['gläubiger'] ?? props['glaeubiger'] ?? '').trim();
-    if (!propToken || !safeEqual(propToken, token) || propCred !== id) {
-      return { statusCode: 400, body: messages.fail[effLang] || messages.fail.en };
-    }
-
-    // Ablauf prüfen (token_iban_expiry bevorzugt; Fallbacks erlaubt)
-    const expiryRaw =
-      props['token_iban_expiry'] ||
-      props['token_iban_expiry'] ||
-      props['token_expiry'] || '';
-    if (expiryRaw) {
+    // Tokenprüfung (IBAN)
+    const tokenStored = String(props.token_iban||'');
+    const expiryRaw   = String(props.token_iban_expiry||props.Token_iban_expiry||'');
+    if(!tokenStored) return { statusCode:401, body:'Token missing' };
+    if(tokenStored !== String(token)) return { statusCode:401, body:'Token mismatch' };
+    if(ENFORCE_EXPIRY && expiryRaw){
       const exp = new Date(expiryRaw);
-      if (isFinite(exp) && exp < new Date()) {
-        if (!TEST_MODE) {
-          return { statusCode: 410, body: messages.fail[effLang] || messages.fail.en };
-        }
-        // TEST_MODE: nur warnen, nicht blocken
-        return { statusCode: 200, body: (messages.warn[effLang] || messages.warn.en) + (messages.success[effLang] || "OK") };
-      }
+      if(isFinite(exp) && exp < new Date()) return { statusCode:410, body:'Token expired' };
     }
 
-    // *** WICHTIG: HIER NICHT MEHR TOKEN LEEREN! ***
-    // Früher wurden token_iban/link_verify beim Check gelöscht (Prefill brach danach).
-    // Verbrauch passiert erst in verify_submit.js nach Formular-Absenden. 
+    // readonly: alles außer sensiblen Feldern ausblenden
+    const readonly = {};
+    for (const [k,v] of Object.entries(props)) {
+      const low = k.toLowerCase();
+      if (low.includes('token')) continue;
+      if (low.includes('iban')) continue;
+      if (low.startsWith('ip_') || low.startsWith('agent_')) continue;
+      if (v == null || typeof v === 'object') continue;
+      readonly[k] = String(v);
+    }
 
-    // Erfolg
-    return { statusCode: 200, body: messages.success[effLang] || "OK" };
-
-  } catch (e) {
-    return { statusCode: 500, body: `Server error: ${e.message}` };
+    return {
+      statusCode:200,
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        ok:true,
+        email,
+        id,
+        readonly,
+        props_all: props   // Fallback fürs Frontend
+      })
+    };
+  }catch(err){
+    const debug = process.env.DEBUG === '1';
+    return debug
+      ? { statusCode:500, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ok:false, error:String(err?.message||err) }) }
+      : { statusCode:500, body:'Server error' };
   }
 };

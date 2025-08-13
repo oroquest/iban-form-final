@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("token").value = token;
 
   try {
-    const response = await fetch(`/.netlify/functions/verify?id=${glaeubigerId}&token=${token}`);
+    const response = await fetch(`/.netlify/functions/iban?id=${glaeubigerId}&token=${token}`);
     const result = await response.json();
 
     if (!response.ok) {

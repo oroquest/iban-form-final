@@ -1,6 +1,5 @@
 
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-
+// Using native fetch available in Node 18+ (Netlify Functions runtime)
 const MJ_BASE = 'https://api.mailjet.com';
 const mjAuthHeader = () => {
   const pub = process.env.MJ_APIKEY_PUBLIC;
@@ -16,7 +15,6 @@ async function mjGetContactByEmail(email) {
   const j = await r.json();
   if (!j || !j.Data || !j.Data.length) throw new Error('contact_not_found');
   const contact = j.Data[0];
-  // get contact data (properties)
   const r2 = await fetch(`${MJ_BASE}/v3/REST/contactdata/${contact.ID}`, { headers: mjAuthHeader() });
   const j2 = await r2.json();
   const props = {};
@@ -53,8 +51,7 @@ function buildIbanLink({ baseUrl, id, token, email, lang }) {
 function pickTemplate({ language, category }) {
   const catNorm = String(category || '').trim().toUpperCase();
   const lang = String(language || 'de').toLowerCase();
-  // IT -> EN mapping (fixed)
-  const finalLang = (lang === 'it') ? 'en' : lang;
+  const finalLang = (lang === 'it') ? 'en' : lang; // IT → EN
   const map = {
     'de__VN DIREKT': process.env.TEMPLATE_DE_IBAN_DIRECT,
     'de__VN ANWALT': process.env.TEMPLATE_DE_IBAN_LAWYER,

@@ -1,6 +1,4 @@
-
 const { mjGetContactByEmail, mjSendEmail, pickTemplate } = require('./_lib');
-
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -15,7 +13,5 @@ exports.handler = async (event) => {
     if (!templateId || !link) return { statusCode: 400, body: 'Missing template or link' };
     await mjSendEmail({ to: email, subject: 'IBAN-Erhebung', templateId, variables: { link, lang, category } });
     return { statusCode: 200, body: JSON.stringify({ ok:true }) };
-  } catch (e) {
-    return { statusCode: 500, body: `error:${e.message}` };
-  }
+  } catch (e) { return { statusCode: 500, body: `error:${e.message}` }; }
 };

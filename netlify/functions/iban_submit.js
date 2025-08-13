@@ -1,58 +1,57 @@
-
-const { mjGetContactByEmail, mjUpdateContactProps, clientIp, userAgent, sanitizeIban, ibanIsValid } = require('./_lib');
+const fetch = require("node-fetch");
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-    const isJson = (event.headers['content-type']||'').includes('application/json');
-    const body = isJson ? JSON.parse(event.body||'{}') : Object.fromEntries(new URLSearchParams(event.body||''));
+    const params = new URLSearchParams(event.body);
+    const id = params.get("id");
+    const token = params.get("token");
+    const iban = params.get("iban");
+    const bic = params.get("bic") || "";
+    const name = params.get("name") || "";
+    const email = Buffer.from(params.get("em") || "", "base64").toString();
 
-    const email = Buffer.from(String(body.em||''), 'base64url').toString('utf8');
-    const id = body.id || '';
-    const token = String(body.token||'').trim();
-    const lang = (body.lang||'de').toLowerCase();
-    const iban = sanitizeIban(body.iban||'');
-    const glaeubiger = body.glaeubiger || '';
-    const bic = String(body.bic||'').toUpperCase().trim();
-    const country = body.country || '';
-
-    if (!email || !id || !token || !iban) return { statusCode: 400, body: JSON.stringify({ ok:false, error:'Missing fields' }) };
-    if (!ibanIsValid(iban)) return { statusCode: 422, body: JSON.stringify({ ok:false, error:'Invalid IBAN' }) };
-    if (bic && !/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bic)) return { statusCode: 422, body: JSON.stringify({ ok:false, error:'Invalid BIC' }) };
-
-    const contact = await mjGetContactByEmail(email);
-    const p = contact.props || {};
-
-    if (p.token_iban !== token) return { statusCode: 403, body: JSON.stringify({ ok:false, error:'Invalid token' }) };
-    const expiry = new Date(p.token_iban_expiry || 0).getTime();
-    const now = Date.now();
-    const testMode = String(process.env.IBAN_TEST_MODE||'0') === '1';
-    if (now > expiry && !testMode) return { statusCode: 410, body: JSON.stringify({ ok:false, error:'Token expired' }) };
-    if (p.token_iban_used_at) return { statusCode: 409, body: JSON.stringify({ ok:false, error:'Token already used' }) };
-
-    const ids = [p.glaeubiger, p.glaeubiger_nr, p.creditor_id, p.id].filter(Boolean).map(String);
-    if (ids.length && !ids.includes(String(id))) {
-      return { statusCode: 403, body: JSON.stringify({ ok:false, error:'ID mismatch' }) };
+    if (!iban || !id || !token || !email) {
+      return { statusCode: 400, body: "Missing parameters" };
     }
 
-    const ts = new Date().toISOString();
-    const update = {
-      iban,
-      glaeubiger,
-      bic,
-      country,
-      ip_iban: clientIp(event),
-      agent_iban: userAgent(event),
-      timestamp_iban: ts,
-      token_iban: '',
-      token_iban_expiry: '',
-      token_iban_used_at: ts,
-      iban_status: 'submitted'
-    };
-    await mjUpdateContactProps(contact.id, update);
+    // IBAN-Prüfung (Mod-97)
+    const ibanNorm = iban.replace(/\s+/g, "").toUpperCase();
+    const ibanNumeric = ibanNorm.slice(4) + ibanNorm.slice(0, 4);
+    const ibanCheck = ibanNumeric.replace(/[A-Z]/g, (c) => c.charCodeAt(0) - 55);
+    const isValid = BigInt(ibanCheck) % 97n === 1n;
+    if (!isValid) {
+      return { statusCode: 400, body: "Invalid IBAN" };
+    }
 
-    return { statusCode: 302, headers: { Location: '/danke.html' }, body: '' };
-  } catch (e) {
-    return { statusCode: 500, body: `error:${e.message}` };
+    // Mailjet-Felder updaten
+    const mjUrl = `https://api.mailjet.com/v3/REST/contact/${encodeURIComponent(email)}`;
+    const mjAuth = Buffer.from(`${process.env.MJ_APIKEY_PUBLIC}:${process.env.MJ_APIKEY_PRIVATE}`).toString("base64");
+    const updateBody = {
+      Data: [
+        { Name: "iban", Value: ibanNorm },
+        { Name: "bic", Value: bic },
+        { Name: "iban_name", Value: name },
+        { Name: "iban_status", Value: "submitted" },
+        { Name: "token_iban", Value: "" },
+        { Name: "token_iban_used_at", Value: new Date().toISOString() }
+      ]
+    };
+    const resp = await fetch(mjUrl, {
+      method: "PUT",
+      headers: { "Authorization": `Basic ${mjAuth}`, "Content-Type": "application/json" },
+      body: JSON.stringify(updateBody)
+    });
+    if (!resp.ok) {
+      return { statusCode: resp.status, body: await resp.text() };
+    }
+
+    return {
+      statusCode: 302,
+      headers: { Location: "/danke.html" },
+      body: ""
+    };
+
+  } catch (err) {
+    return { statusCode: 500, body: err.toString() };
   }
 };

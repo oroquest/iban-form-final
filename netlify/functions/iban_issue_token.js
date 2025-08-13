@@ -1,56 +1,53 @@
-
-const { mjGetContactByEmail, mjUpdateContactProps, mjSendEmail, buildIbanLink, addDaysIso, pickTemplate } = require('./_lib');
+const fetch = require("node-fetch");
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-    const body = event.headers['content-type']?.includes('application/json') ? JSON.parse(event.body||'{}') : Object.fromEntries(new URLSearchParams(event.body||''));
-    const email = String(body.email||'').trim();
-    const id = body.id ?? '';
-    const lang = (body.lang || 'de').toLowerCase();
-    const category = String(body.category || process.env.IBAN_DEFAULT_CATEGORY || 'VN DIREKT');
-    const send = String(body.send||'').toLowerCase() in { '1':1, 'true':1, 'yes':1 };
+    const params = new URLSearchParams(event.body);
+    const email = params.get("email");
+    const id = params.get("id");
+    const lang = params.get("lang") || "de";
+    const category = params.get("category") || process.env.IBAN_DEFAULT_CATEGORY;
+    const send = params.get("send") || "0";
 
-    if (!email) return { statusCode: 400, body: 'Missing email' };
-
-    let contact;
-    try { contact = await mjGetContactByEmail(email); }
-    catch (e) {
-      if (String(e.message).includes('contact_not_found')) {
-        return { statusCode: 404, body: JSON.stringify({ ok:false, error:'contact_not_found', email }) };
-      }
-      throw e;
+    if (!email || !id) {
+      return { statusCode: 400, body: "Missing email or id" };
     }
 
-    const token = require('crypto').randomBytes(16).toString('hex');
-    const expires = addDaysIso(Number(process.env.IBAN_TOKEN_DAYS||7));
-    const baseUrl = process.env.BASE_IBAN_URL || 'https://iban.sikuralife.com';
-    const url = buildIbanLink({ baseUrl, id, token, email, lang });
+    // Token erzeugen
+    const crypto = require("crypto");
+    const token = crypto.randomBytes(16).toString("hex");
+    const days = parseInt(process.env.IBAN_TOKEN_DAYS || "5", 10);
+    const expiry = new Date(Date.now() + days * 86400000).toISOString();
 
-    await mjUpdateContactProps(contact.id, {
-      token_iban: token,
-      token_iban_expiry: expires,
-      token_iban_used_at: '',
-      link_iban: url,
-      sprache: lang,
-      iban_status: 'issued'
+    // In Mailjet speichern
+    const mjUrl = `https://api.mailjet.com/v3/REST/contact/${encodeURIComponent(email)}`;
+    const mjAuth = Buffer.from(`${process.env.MJ_APIKEY_PUBLIC}:${process.env.MJ_APIKEY_PRIVATE}`).toString("base64");
+    const updateBody = {
+      Data: [
+        { Name: "token_iban", Value: token },
+        { Name: "token_iban_expiry", Value: expiry },
+        { Name: "iban_status", Value: "issued" },
+        { Name: "glaeubiger_id", Value: id }
+      ]
+    };
+    const resp = await fetch(mjUrl, {
+      method: "PUT",
+      headers: { "Authorization": `Basic ${mjAuth}`, "Content-Type": "application/json" },
+      body: JSON.stringify(updateBody)
     });
-
-    let sent = false;
-    if (send) {
-      const templateId = pickTemplate({ language: lang, category });
-      if (!templateId) throw new Error('template_missing');
-      await mjSendEmail({
-        to: email,
-        subject: 'IBAN-Erhebung',
-        templateId,
-        variables: { link: url, id, lang, category }
-      });
-      sent = true;
+    if (!resp.ok) {
+      return { statusCode: resp.status, body: await resp.text() };
     }
 
-    return { statusCode: 200, body: JSON.stringify({ ok:true, token, expiresAt: expires, url, sent }) };
-  } catch (e) {
-    return { statusCode: 500, body: `error:${e.message}` };
+    const baseUrl = process.env.BASE_IBAN_URL || "https://iban.sikuralife.com";
+    const link = `${baseUrl}/?id=${id}&token=${token}&em=${Buffer.from(email).toString("base64")}&lang=${lang}`;
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, url: link })
+    };
+
+  } catch (err) {
+    return { statusCode: 500, body: err.toString() };
   }
 };

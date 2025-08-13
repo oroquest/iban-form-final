@@ -1,454 +1,199 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura – Adressbestätigung</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>IBAN-Erfassung – SIKURA Leben AG i.L.</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
-    .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
-    .row { display:flex; gap:16px; }
-    .row > div { flex:1; }
-    label { display:block; margin:12px 0 6px; font-weight:600; }
-    input[type="text"], textarea, select { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff; }
-    input[readonly] { background:#f3f4f6; color:#6b7280; }
-    .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
-    .checkbox-group { margin-top:12px; }
-    .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
-    .hint { font-size:14px; color:#6b7280; margin-top:6px; }
-    .ctx { background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:10px; margin:12px 0 16px; }
-    .field-error { color:#b91c1c; font-size:13px; margin-top:4px; display:none; }
-    .ok { color:#065f46; margin:10px 0; display:none; }
-    button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
-    button:disabled { opacity:.6; cursor:not-allowed; }
-    .logo { height:48px; margin-bottom:12px; }
-    .hidden { display:none; }
-    .error-field { border-color:#b91c1c !important; }
-    .linkline { margin-top:4px; }
-    #gate-error { padding:8px 12px; background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; }
+    :root{--fg:#0b0b0b;--bg:#fff;--muted:#666;--border:#e6e6e6}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif}
+    body{margin:0;background:var(--bg);color:var(--fg)}
+    .container{max-width:860px;margin:32px auto;padding:0 16px}
+    h1,h2{margin:8px 0 12px}
+    .hint{color:var(--muted);margin:-2px 0 12px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+    input,select,button{padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-weight:500}
+    input[disabled]{background:#fafafa;color:#777}
+    hr{margin:28px 0;border:none;border-top:1px solid var(--border)}
+    .checks{margin:12px 0;display:flex;flex-direction:column;gap:8px}
+    .error{color:#b00020;font-size:14px;margin:6px 0 0;display:none}
+    .small{color:var(--muted);font-size:14px}
+    button{cursor:pointer}
+    @media (max-width:680px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="language-switcher">
-      <select id="language">
-        <option value="de">Deutsch</option>
-        <option value="it">Italiano</option>
-        <option value="en">English</option>
-      </select>
-    </div>
-
-    <img src="siku_logo.png" alt="Sikura Life" class="logo" />
-    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
-    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
-
-    <div id="ctx-box" class="ctx"></div>
-
-    <div id="gate-error" class="field-error hidden" role="alert" aria-live="polite"></div>
-    <div id="gate-ok" class="ok hidden"></div>
-
-    <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit" novalidate>
-      <!-- Hidden: email/lang/id/token/em -->
-      <input type="hidden" id="email" name="email" />
-      <input type="hidden" id="lang" name="lang" />
-      <input type="hidden" id="id"    name="id"    />
-      <input type="hidden" id="token" name="token" />
-      <input type="hidden" id="em"    name="em"    />
-
-      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger-Nr.</label>
-      <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
-      <div class="hint" id="hint-glaeubiger"></div>
-      <div class="field-error" id="err-glaeubiger"></div>
-
-      <label for="firstname" id="lbl-firstname">Vorname</label>
-      <input type="text" id="firstname" name="firstname" required readonly />
-      <div class="hint" id="hint-firstname"></div>
-      <div class="field-error" id="err-firstname"></div>
-
-      <label for="name" id="lbl-name">Nachname</label>
-      <input type="text" id="name" name="name" required readonly />
-      <div class="hint" id="hint-name"></div>
-      <div class="field-error" id="err-name"></div>
-
-      <div class="row">
-        <div>
-          <label for="strasse" id="lbl-strasse">Strasse</label>
-          <input type="text" id="strasse" name="strasse" required />
-          <div class="hint" id="hint-strasse"></div>
-          <div class="field-error" id="err-strasse"></div>
-        </div>
-        <div style="max-width:180px;">
-          <label for="hausnummer" id="lbl-hausnummer">Nr.</label>
-          <input type="text" id="hausnummer" name="hausnummer" required />
-          <div class="hint" id="hint-hausnummer"></div>
-          <div class="field-error" id="err-hausnummer"></div>
-        </div>
-      </div>
-
-      <div class="row">
-        <div style="max-width:200px;">
-          <label for="plz" id="lbl-plz">PLZ</label>
-          <input type="text" id="plz" name="plz" required inputmode="numeric" pattern="\d*" autocomplete="postal-code" />
-          <div class="hint" id="hint-plz"></div>
-          <div class="field-error" id="err-plz"></div>
-        </div>
-        <div>
-          <label for="ort" id="lbl-ort">Ort</label>
-          <input type="text" id="ort" name="ort" required />
-          <div class="hint" id="hint-ort"></div>
-          <div class="field-error" id="err-ort"></div>
-        </div>
-      </div>
-
-      <label for="country" id="lbl-country">Land</label>
-      <input type="text" id="country" name="country" required />
-      <div class="hint" id="hint-country"></div>
-      <div class="field-error" id="err-country"></div>
-
-      <div class="checkbox-group">
-        <label class="checkbox-line">
-          <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+  <main class="container">
+    <!-- OBERER TEIL: Verify-Daten nur anzeigen (wie im Verify-Flow) -->
+    <section>
+      <h1>Bitte bestätigen Sie Ihre bereits erfassten Daten</h1>
+      <p class="hint">Die folgenden Angaben stammen aus Ihrem bereits bestätigten Verify‑Prozess und sind nur zur Kontrolle sichtbar.</p>
+      <div class="grid">
+        <label>Gläubiger‑Nr.
+          <input id="ro_creditor" disabled />
         </label>
-        <div class="hint" id="hint-confirm"></div>
-        <div class="field-error" id="err-confirm"></div>
-      </div>
-      <div class="checkbox-group">
-        <label class="checkbox-line">
-          <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+        <label>Vorname
+          <input id="ro_firstname" disabled />
         </label>
-        <div class="hint" id="hint-privacy"></div>
-        <div class="field-error" id="err-privacy"></div>
+        <label>Nachname
+          <input id="ro_lastname" disabled />
+        </label>
+        <label>Strasse
+          <input id="ro_street" disabled />
+        </label>
+        <label>Nr.
+          <input id="ro_houseno" disabled />
+        </label>
+        <label>PLZ
+          <input id="ro_zip" disabled />
+        </label>
+        <label>Ort
+          <input id="ro_city" disabled />
+        </label>
+        <label>Land
+          <input id="ro_country" disabled />
+        </label>
       </div>
+    </section>
 
-      <div class="hint linkline">
-        <a id="privacy-link" href="privacy.html?lang=de" target="_blank" rel="noopener">Datenschutzhinweise</a>
-      </div>
+    <hr />
 
-      <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
-    </form>
-  </div>
+    <!-- UNTERER TEIL: IBAN-Erfassung -->
+    <section>
+      <h2>IBAN erfassen</h2>
+      <form id="ibanForm" method="POST" action="/.netlify/functions/iban_submit" novalidate>
+        <label>IBAN*
+          <input id="iban" name="iban" required maxlength="34" placeholder="CH93 0076 2011 6238 5295 7" />
+          <span id="ibanErr" class="error">Bitte eine gültige IBAN eingeben (Format & Prüfsumme).</span>
+        </label>
+
+        <label>BIC (optional)
+          <input id="bic" name="bic" maxlength="11" placeholder="ZKBKCHZZ80A" />
+          <span id="bicErr" class="error">BIC ist ungültig.</span>
+        </label>
+
+        <label>Kontoinhaber (optional)
+          <input id="acc_holder" name="glaeubiger" autocomplete="name" />
+        </label>
+
+        <!-- Hidden Felder wie im Verify-Prozess -->
+        <input type="hidden" id="hid_id" name="id" />
+        <input type="hidden" id="hid_token" name="token" />
+        <input type="hidden" id="hid_em" name="em" />
+        <input type="hidden" id="hid_lang" name="lang" />
+
+        <div class="checks">
+          <label><input type="checkbox" id="cb1" required /> Ich bestätige, dass die Angaben korrekt sind.</label>
+          <label><input type="checkbox" id="cb2" required /> Ich stimme der Verarbeitung gemäss Datenschutzhinweisen zu.</label>
+        </div>
+
+        <button type="submit">Senden</button>
+        <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Datenschutzhinweise</a></p>
+      </form>
+    </section>
+  </main>
 
   <script>
-    const i18n = {
-      de: { title:"Bitte bestätigen Sie Ihre Adresse", intro:"Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.", ctx:"Bitte geben Sie Ihre vollständigen und korrekten Adressdaten ein.",
-        glaeubiger:"Gläubiger-Nr.", firstname:"Vorname", name:"Nachname", strasse:"Strasse", hausnummer:"Nr.", plz:"PLZ", ort:"Ort", country:"Land",
-        hintGlaeubiger:"Nummer des Gläubigers.", hintFirst:"Vorname gemäss Personalausweis.", hintName:"Nachname gemäss Personalausweis.", hintStrasse:"Strassenname gemäss offizieller Adresse ohne Hausnummer.",
-        hintHausnummer:"Hausnummer gemäss offizieller Adresse.", hintZIP:"Postleitzahl gemäss Land (CH/LI = 4 Ziffern, DE/IT = 5 Ziffern).", hintOrt:"Ort gemäss offizieller Adresse.", hintCountry:"Land gemäss offizieller Adresse.",
-        confirm:"Ich bestätige, dass die angegebenen Daten korrekt sind.", privacy:"Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.", privacyLink:"Datenschutzhinweise", submit:"Absenden",
-        errRequired:"Pflichtfeld – bitte ausfüllen.", errDigits:"Es sind nur Ziffern erlaubt.", errConfirm:"Bitte bestätigen Sie die Richtigkeit der Angaben.", errPrivacy:"Bitte stimmen Sie der DSGVO-Verarbeitung zu.",
-        errZIPLenCH:"PLZ muss 4 Ziffern haben (CH).", errZIPLenLI:"PLZ muss 4 Ziffern haben (LI).", errZIPLenIT:"PLZ muss 5 Ziffern haben (IT).", errZIPLenDE:"PLZ muss 5 Ziffern haben (DE).",
-        expiry:"Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.", gateFail:"Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.", gateOk:"Link geprüft – Formular freigeschaltet.",
-        errInvalidToken:"Link ungültig oder bereits verwendet.", errTokenExpired:"Link abgelaufen.", errTokenUsed:"Link bereits verwendet.", errGeneric:"Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut." },
-      it: { title:"Per favore conferma il tuo indirizzo", intro:"I campi sono precompilati e possono essere aggiornati se necessario.", ctx:"Si prega di inserire i dati completi e corretti dell'indirizzo.",
-        glaeubiger:"Numero del creditore", firstname:"Nome", name:"Cognome", strasse:"Via", hausnummer:"Nr.", plz:"CAP", ort:"Città", country:"Paese",
-        hintGlaeubiger:"Numero del creditore come da comunicazione.", hintFirst:"Nome secondo la carta d'identità.", hintName:"Cognome secondo la carta d'identità.", hintStrasse:"Nome della via senza numero civico.",
-        hintHausnummer:"Numero civico secondo l'indirizzo ufficiale.", hintZIP:"CAP secondo il paese (CH/LI = 4 cifre, DE/IT = 5 cifre).", hintOrt:"Località secondo l'indirizzo ufficiale.", hintCountry:"Paese secondo l'indirizzo ufficiale.",
-        confirm:"Confermo che i dati forniti sono corretti.", privacy:"Acconsento al trattamento dei miei dati secondo il GDPR.", privacyLink:"Informativa privacy", submit:"Invia",
-        errRequired:"Campo obbligatorio – compila per favore.", errDigits:"Sono consentite solo cifre.", errConfirm:"Conferma che i dati sono corretti.", errPrivacy:"Fornisci il consenso GDPR.",
-        errZIPLenCH:"Il CAP deve avere 4 cifre (CH).", errZIPLenLI:"Il CAP deve avere 4 cifre (LI).", errZIPLenIT:"Il CAP deve avere 5 cifre (IT).", errZIPLenDE:"Il CAP deve avere 5 cifre (DE).",
-        expiry:"Nota: Per motivi di sicurezza il link è valido per 7 giorni.", gateFail:"Verifica non riuscita. Il link non è valido o è scaduto.", gateOk:"Link verificato – modulo abilitato.",
-        errInvalidToken:"Link non valido o già utilizzato.", errTokenExpired:"Link scaduto.", errTokenUsed:"Link già utilizzato.", errGeneric:"Si è verificato un errore. Riprova più tardi." },
-      en: { title:"Please confirm your address", intro:"Fields are pre-filled and can be updated if needed.", ctx:"Please enter your complete and correct address details.",
-        glaeubiger:"Creditor No.", firstname:"First name", name:"Last name", strasse:"Street", hausnummer:"No.", plz:"ZIP", ort:"City/Town", country:"Country",
-        hintGlaeubiger:"Creditor number as stated in the letter.", hintFirst:"First name according to identity card.", hintName:"Last name according to identity card.", hintStrasse:"Street name without house number.",
-        hintHausnummer:"House number as per official address.", hintZIP:"ZIP code according to country (CH/LI = 4 digits, DE/IT = 5 digits).", hintOrt:"City/Town as per official address.", hintCountry:"Country as per official address.",
-        confirm:"I confirm that the information provided is correct.", privacy:"I consent to the processing of my data under GDPR.", privacyLink:"Privacy notice", submit:"Submit",
-        errRequired:"Required field — please fill in.", errDigits:"Digits only.", errConfirm:"Please confirm the information is correct.", errPrivacy:"Please provide GDPR consent.",
-        errZIPLenCH:"ZIP must be 4 digits (CH).", errZIPLenLI:"ZIP must be 4 digits (LI).", errZIPLenIT:"ZIP must be 5 digits (IT).", errZIPLenDE:"ZIP must be 5 digits (DE).",
-        expiry:"Note: For security, the confirmation link is valid for 7 days.", gateFail:"Verification failed. The link is invalid or expired.", gateOk:"Link verified – form enabled.",
-        errInvalidToken:"Link invalid or already used.", errTokenExpired:"Link expired.", errTokenUsed:"Link already used.", errGeneric:"An error occurred. Please try again later." }
-    };
-
-    function setLanguage(lang) {
-      const d = i18n[lang] || i18n.de;
-      document.documentElement.lang = lang;
-      document.getElementById('title').textContent = d.title;
-      document.getElementById('intro').textContent = d.intro;
-      document.getElementById('lbl-glaeubiger').textContent = d.glaeubiger;
-      document.getElementById('lbl-firstname').textContent = d.firstname;
-      document.getElementById('lbl-name').textContent = d.name;
-      document.getElementById('lbl-strasse').textContent = d.strasse;
-      document.getElementById('lbl-hausnummer').textContent = d.hausnummer;
-      document.getElementById('lbl-plz').textContent = d.plz;
-      document.getElementById('lbl-ort').textContent = d.ort;
-      document.getElementById('lbl-country').textContent = d.country;
-      document.getElementById('txt-confirm').textContent = d.confirm;
-      document.getElementById('txt-privacy').textContent = d.privacy;
-      document.getElementById('btn-submit').textContent = d.submit;
-      document.getElementById('hint-expiry').textContent = d.expiry;
-      const box = document.getElementById('ctx-box'); if (box) box.textContent = d.ctx;
-      const map = [
-        ['hint-glaeubiger','hintGlaeubiger'],
-        ['hint-firstname','hintFirst'],
-        ['hint-name','hintName'],
-        ['hint-strasse','hintStrasse'],
-        ['hint-hausnummer','hintHausnummer'],
-        ['hint-plz','hintZIP'],
-        ['hint-ort','hintOrt'],
-        ['hint-country','hintCountry']
-      ];
-      for (const [id,key] of map) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = d[key] || '';
-      }
-      const plink = document.getElementById('privacy-link');
-      if (plink) {
-        plink.textContent = d.privacyLink;
-        plink.href = `privacy.html?lang=${lang}`;
-      }
+    // ---------- Hilfsfunktionen (IBAN Client-Check wie besprochen) ----------
+    function ibanSanitize(s){ return String(s||'').toUpperCase().replace(/\s+/g,''); }
+    function toNum(ch){ const c=ch.charCodeAt(0); if(c>=48&&c<=57) return ch; if(c>=65&&c<=90) return String(c-55); return ''; }
+    function mod97Str(str){ let rem=0,buf=''; for(const ch of str){ buf+=toNum(ch); while(buf.length>=7){ rem = Number(String(rem)+buf.slice(0,7))%97; buf = buf.slice(7);} } if(buf.length) rem = Number(String(rem)+buf)%97; return rem; }
+    function ibanIsValid(raw){
+      const s = ibanSanitize(raw);
+      if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+      const rearr = s.slice(4)+s.slice(0,4);
+      return mod97Str(rearr) === 1;
     }
-
-    function qs(name) {
-      const p = new URLSearchParams(location.search);
-      return p.get(name) || "";
+    function bicIsValid(raw){
+      const s = String(raw||'').toUpperCase().trim();
+      if(!s) return true; // optional
+      return /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s);
     }
+    function formatIBAN(raw){ return ibanSanitize(raw).replace(/(.{4})/g,'$1 ').trim(); }
 
-    function b64urlDecode(str) {
+    // ---------- URL-Parameter & Hidden Felder (wie Verify) ----------
+    const qs = new URLSearchParams(location.search);
+    const q_id    = (qs.get('id')||'').trim();
+    const q_token = (qs.get('token')||'').trim();
+    const q_em    = (qs.get('em')||'').trim();
+    const q_lang  = (qs.get('lang')||'de').toLowerCase();
+
+    document.getElementById('hid_id').value    = q_id;
+    document.getElementById('hid_token').value = q_token;
+    document.getElementById('hid_em').value    = q_em;
+    document.getElementById('hid_lang').value  = q_lang;
+
+    // Zeige die Gläubiger-Nr. direkt aus der URL (wie gewünscht)
+    document.getElementById('ro_creditor').value = q_id;
+
+    // ---------- Verify-Check aufrufen und Anzeige füllen (wie im Verify-Prozess) ----------
+    // Wir nutzen den bestehenden verify_check-Endpoint, der im kopierten Verify-Repo schon funktioniert.
+    (async () => {
       try {
-        let s = str.replace(/-/g,'+').replace(/_/g,'/');
-        while (s.length % 4 !== 0) s += '=';
-        return decodeURIComponent(escape(atob(s)));
-      } catch (e) {
-        try {
-          let s = str.replace(/-/g,'+').replace(/_/g,'/');
-          while (s.length % 4 !== 0) s += '=';
-          return atob(s);
-        } catch (err) { return ""; }
+        const url = `/.netlify/functions/verify_check?id=${encodeURIComponent(q_id)}&token=${encodeURIComponent(q_token)}&lang=${encodeURIComponent(q_lang)}&em=${encodeURIComponent(q_em)}`;
+        const r = await fetch(url);
+        if(!r.ok) throw new Error('verify_check_failed');
+        const data = await r.json();
+
+        // Tolerantes Mapping, damit es 1:1 mit euren Verify-Props funktioniert.
+        const p = data.display || data || {};
+
+        const first = p.firstname || p.vorname || '';
+        const last  = p.name || p.nachname || '';
+        const street= p.strasse || p.adresse_strasse || p.street || '';
+        const houseno = p.hausnummer || p.adresse_hausnummer || p.nr || '';
+        const zip   = p.plz || p.adresse_plz || p.zip || '';
+        const city  = p.ort || p.adresse_ort || p.city || '';
+        const country = p.land || p.adresse_land || p.country || '';
+
+        document.getElementById('ro_firstname').value = first;
+        document.getElementById('ro_lastname').value  = last;
+        document.getElementById('ro_street').value    = street;
+        document.getElementById('ro_houseno').value   = houseno;
+        document.getElementById('ro_zip').value       = zip;
+        document.getElementById('ro_city').value      = city;
+        document.getElementById('ro_country').value   = country;
+      } catch(e){
+        // Wenn der Check fehlschlägt (Token falsch/abgelaufen), freundlich abbrechen
+        alert("Der Zugriffslink ist ungültig oder abgelaufen.");
       }
-    }
-
-    function safeSet(id, value) {
-      if (value !== undefined && value !== null && String(value).trim() !== "") {
-        const el = document.getElementById(id);
-        if (el) el.value = value;
-      }
-    }
-
-    function showError(id, msgKey) {
-      const langEl = document.getElementById('lang').value;
-      const dict = i18n[langEl] || i18n.de;
-      const input = document.getElementById(id);
-      const errEl = document.getElementById('err-' + id);
-      if (input) input.classList.add('error-field');
-      if (errEl) { errEl.textContent = dict[msgKey] || ""; errEl.style.display = 'block'; }
-    }
-
-    function clearError(id) {
-      const input = document.getElementById(id);
-      const errEl = document.getElementById('err-' + id);
-      if (input) input.classList.remove('error-field');
-      if (errEl) { errEl.textContent = ""; errEl.style.display = 'none'; }
-    }
-
-    // Harden PLZ input behavior
-    document.addEventListener('DOMContentLoaded', () => {
-      const plzEl = document.getElementById('plz');
-      plzEl.addEventListener('beforeinput', (e) => {
-        if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return;
-        if (typeof e.data === 'string' && /\D/.test(e.data)) e.preventDefault();
-      });
-      plzEl.addEventListener('input', (e) => {
-        const cleaned = e.target.value.replace(/\D+/g, '');
-        if (e.target.value !== cleaned) e.target.value = cleaned;
-      });
-      plzEl.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const text = (e.clipboardData || window.clipboardData).getData('text');
-        const onlyDigits = String(text).replace(/\D+/g, '');
-        document.execCommand('insertText', false, onlyDigits);
-      });
-      plzEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const text = (e.dataTransfer && e.dataTransfer.getData('text')) || '';
-        const onlyDigits = String(text).replace(/\D+/g, '');
-        if (onlyDigits) plzEl.value = plzEl.value + onlyDigits;
-        plzEl.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      plzEl.addEventListener('blur', () => {
-        const cleaned = plzEl.value.replace(/\D+/g, '');
-        if (plzEl.value !== cleaned) plzEl.value = cleaned;
-      });
-    });
-
-    function normalizeCountry(raw) {
-      const s = (raw || "").trim().toLowerCase();
-      if (!s) return "";
-      if (["ch","che","schweiz","switzerland","suisse","svizzera"].includes(s)) return "CH";
-      if (["li","liechtenstein","lichtenstein"].includes(s)) return "LI";
-      if (["it","ita","italien","italia","italy"].includes(s)) return "IT";
-      if (["de","deu","deutschland","germany","alemania"].includes(s)) return "DE";
-      return "";
-    }
-
-    (async function init() {
-      const lang = (qs('lang') || '').toLowerCase();
-      const currentLang = ['de','it','en'].includes(lang) ? lang : 'de';
-      document.getElementById('language').value = currentLang;
-      document.getElementById('lang').value = currentLang;
-      setLanguage(currentLang);
-      document.getElementById('language').addEventListener('change', (e)=>{
-        const l = e.target.value; document.getElementById('lang').value = l; setLanguage(l);
-      });
-
-      // URL-Params
-      const id = qs('id');
-      const token = qs('token');
-      const em = qs('em');
-
-      if (!id || !token || !em) {
-        const err = i18n[currentLang].gateFail;
-        const el = document.getElementById('gate-error'); el.textContent = err; el.classList.remove('hidden'); el.focus?.(); return;
-      }
-
-      const email = b64urlDecode(em).trim() || (qs('email') || "");
-      safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
-
-      try {
-        // *** WICHTIG: em+token (+glaeubiger=id) mitsenden ***
-        const url = `/.netlify/functions/get_contact?em=${encodeURIComponent(em)}&token=${encodeURIComponent(token)}&glaeubiger=${encodeURIComponent(id)}`;
-        const resp = await fetch(url, { headers: { 'Accept':'application/json' } });
-
-        if (resp.status === 403) throw new Error('403');
-        if (resp.status === 410) throw new Error('410');
-        if (!resp.ok) throw new Error(String(resp.status));
-
-        const data = await resp.json();
-
-        const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
-        safeSet('glaeubiger', glaeubiger);
-        ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
-
-        if (glaeubiger && id && glaeubiger !== id) {
-          const el = document.getElementById('gate-error');
-          el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
-          el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
-          return;
-        }
-
-        const ok = document.getElementById('gate-ok');
-        ok.textContent = i18n[currentLang].gateOk;
-        ok.classList.remove('hidden');
-        document.getElementById('verify-form').classList.remove('hidden');
-      } catch (e) {
-        const el = document.getElementById('gate-error');
-        let msg = i18n[currentLang].gateFail;
-        if (e && e.message === '410') msg = i18n[currentLang].errTokenExpired;
-        if (e && e.message === '403') msg = i18n[currentLang].errInvalidToken;
-        el.textContent = msg;
-        el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
-      }
-
-      // Live-clear + blur validation
-      const req = ['firstname','name','strasse','hausnummer','plz','ort','country'];
-      req.forEach(id => {
-        const el = document.getElementById(id);
-        el.addEventListener('input', () => clearError(id));
-        el.addEventListener('blur',  () => validateField(id));
-      });
-      ['confirm','privacy'].forEach(id => {
-        const el = document.getElementById(id);
-        el.addEventListener('change', () => clearError(id));
-      });
-
-      // Revalidate PLZ on country change
-      document.getElementById('country').addEventListener('input', () => {
-        const el = document.getElementById('plz');
-        if (!el.value.trim()) return;
-        validateField('plz');
-      });
-
-      // Submit via AJAX
-      const form = document.getElementById('verify-form');
-      form.addEventListener('submit', async (e) => {
-        let hasError = false;
-        const must = ['firstname','name','strasse','hausnummer','plz','ort','country'];
-        must.forEach(id => { if (!validateField(id)) hasError = true; });
-        if (!document.getElementById('confirm').checked) { showError('confirm', 'errConfirm'); hasError = true; }
-        if (!document.getElementById('privacy').checked) { showError('privacy', 'errPrivacy'); hasError = true; }
-        if (hasError) { e.preventDefault(); return false; }
-
-        e.preventDefault();
-        const dict = i18n[document.getElementById('lang').value] || i18n.de;
-
-        const fd = new FormData(form);
-        const body = new URLSearchParams(fd).toString();
-
-        const errBox = document.getElementById('gate-error');
-        errBox.classList.add('hidden'); errBox.textContent = '';
-
-        try {
-          const resp = await fetch(form.action, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-              'Accept': 'application/json',
-              'X-Requested-With': 'fetch'
-            },
-            body
-          });
-
-          if (resp.ok) {
-            const data = await resp.json().catch(() => ({}));
-            if (data && data.redirect) {
-              window.location.href = data.redirect;
-            } else if (resp.redirected) {
-              window.location.href = resp.url;
-            } else {
-              window.location.href = '/danke.html';
-            }
-            return;
-          }
-
-          let msg = dict.errGeneric;
-          if (resp.status === 403) msg = dict.errInvalidToken;
-          else if (resp.status === 410) msg = dict.errTokenExpired;
-          else if (resp.status === 409) msg = dict.errTokenUsed;
-
-          const detail = await resp.text().catch(()=>'');
-
-          errBox.textContent = msg;
-          if (detail && detail.length < 200) errBox.title = detail;
-
-          errBox.classList.remove('hidden');
-          errBox.scrollIntoView({behavior:'smooth', block:'center'});
-
-          if (getComputedStyle(errBox).display === 'none') {
-            alert(msg);
-          }
-
-        } catch (err) {
-          const errBox2 = document.getElementById('gate-error');
-          errBox2.textContent = (i18n[document.getElementById('lang').value] || i18n.de).errGeneric;
-          errBox2.classList.remove('hidden');
-          errBox2.scrollIntoView({behavior:'smooth', block:'center'});
-        }
-      });
     })();
 
-    function validateField(id) {
-      const langEl = document.getElementById('lang').value;
-      const dict = i18n[langEl] || i18n.de;
-      const el = document.getElementById(id);
-      clearError(id);
-      let v = (el.value || "").trim();
+    // ---------- UX: Live-Format & Validierung ----------
+    const $iban = document.getElementById('iban');
+    const $bic  = document.getElementById('bic');
+    const $ibanErr = document.getElementById('ibanErr');
+    const $bicErr  = document.getElementById('bicErr');
 
-      if (!v) { showError(id, 'errRequired'); return false; }
+    $iban.addEventListener('input', () => {
+      const caret = $iban.selectionStart;
+      const before = $iban.value;
+      $iban.value = formatIBAN(before);
+      // Caret-Repositionierung ist optional; hier simpel.
+    });
 
-      if (id === 'plz') {
-        v = v.replace(/\D+/g, '');
-        if (el.value !== v) el.value = v;
-        if (!/^\d+$/.test(v)) { showError('plz','errDigits'); return false; }
-        const cc = normalizeCountry(document.getElementById('country').value);
-        if (cc === 'CH' && v.length !== 4) { showError('plz','errZIPLenCH'); return false; }
-        if (cc === 'LI' && v.length !== 4) { showError('plz','errZIPLenLI'); return false; }
-        if (cc === 'IT' && v.length !== 5) { showError('plz','errZIPLenIT'); return false; }
-        if (cc === 'DE' && v.length !== 5) { showError('plz','errZIPLenDE'); return false; }
+    document.getElementById('ibanForm').addEventListener('submit', (ev) => {
+      $ibanErr.style.display = 'none';
+      $bicErr.style.display = 'none';
+
+      const rawIban = $iban.value;
+      const rawBic  = $bic.value;
+
+      if(!ibanIsValid(rawIban)){
+        ev.preventDefault();
+        $ibanErr.style.display = 'block';
+        return;
       }
-      return true;
-    }
+      if(!bicIsValid(rawBic)){
+        ev.preventDefault();
+        $bicErr.style.display = 'block';
+        return;
+      }
+
+      // Vor dem Submit sauber machen
+      $iban.value = ibanSanitize(rawIban);
+    });
   </script>
 </body>
 </html>

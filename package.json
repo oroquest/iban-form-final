@@ -1,11 +1,8 @@
 {
   "name": "iban-sikuralife",
   "version": "1.0.0",
-  "private": true,
-  "license": "UNLICENSED",
-  "engines": {
-    "node": ">=18"
-  },
+  "description": "IBAN Functions with node-fetch dependency",
+  "main": "index.js",
   "dependencies": {
     "node-fetch": "^2.6.12"
   }

@@ -1,9 +1,5 @@
 {
-  "name": "iban-work",
-  "private": true,
+  "name": "visionflow-verify",
   "version": "1.0.0",
-  "engines": {
-    "node": ">=18"
-  },
-  "type": "commonjs"
+  "dependencies": {}
 }

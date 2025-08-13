@@ -1,8 +1,8 @@
 // netlify/functions/iban_ro.js
-// Verify-style flow:
-// 1) Validate token_iban for the given email via Mailjet
-// 2) Fetch record for given id via internal get_contact (server-side) with x-internal-key
-// 3) Return readonly data for UI (no browser call to get_contact)
+// Verify-like flow for IBAN form:
+// - Validate token_iban (and optional expiry) via Mailjet for given email
+// - Fetch readonly contact data for the given id via internal get_contact (server-side, x-internal-key)
+// - Return readonly data for UI consumption (no client-side call to get_contact)
 
 let fetchImpl = (typeof fetch !== 'undefined') ? fetch : null;
 if (!fetchImpl) { fetchImpl = require('node-fetch'); }
@@ -10,6 +10,9 @@ const fetchFn = (...args) => fetchImpl(...args);
 
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
+if (!MJ_PUBLIC || !MJ_PRIVATE) {
+  console.warn("Missing Mailjet API keys");
+}
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
 const ENFORCE_EXPIRY = (process.env.ENFORCE_EXPIRY || '0') === '1';
@@ -33,6 +36,7 @@ function parseInputs(event){
   let email = b.email ?? q.email;
   let lang  = (b.lang ?? q.lang ?? 'de').toLowerCase();
 
+  // Fallback: try Referer (if a proxy stripped the query)
   if ((!id || !token || (!em && !email)) && (event.headers.referer || event.headers.Referer)) {
     try {
       const ref = event.headers.referer || event.headers.Referer;
@@ -68,7 +72,7 @@ exports.handler = async (event) => {
 
     if (!email || !token || !id) return jres(400, { ok:false, error:'Missing id/token/email', got:{ query:q, body:b } });
 
-    // 1) validate token via Mailjet
+    // 1) Validate token via Mailjet
     const contactId = await mjGetContactIdByEmail(email);
     const r = await fetchFn(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(contactId)}`, {
       headers:{ Authorization: mjAuth }
@@ -83,15 +87,15 @@ exports.handler = async (event) => {
     if(tokenStored !== String(token)) return jres(401, { ok:false, error:'Token mismatch' });
     if(ENFORCE_EXPIRY && expiryRaw){ const exp=safeDate(expiryRaw); if(exp && exp < new Date()) return jres(410, { ok:false, error:'Token expired' }); }
 
-    // 2) server-side get_contact by ID
+    // 2) Fetch readonly data for ID via internal get_contact (server-side)
     if (!INTERNAL_KEY) return jres(500, { ok:false, error:'Missing GET_CONTACT_INTERNAL_KEY' });
     const url = `${GET_CONTACT_BASE_URL}/.netlify/functions/get_contact?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}`;
     const rc = await fetchFn(url, { headers:{ 'x-internal-key': INTERNAL_KEY } });
     if(!rc.ok){ const t=await rc.text(); return jres(rc.status, { ok:false, error:`get_contact failed: ${rc.status}`, body:t }); }
     const cj = await rc.json();
+    const readonly = cj.readonly || cj.data || cj || {};
 
-    // cj.readonly sollte kommen wie im Verify-Prozess
-    return jres(200, { ok:true, email, id, readonly: cj.readonly || cj.data || cj, source: 'get_contact' });
+    return jres(200, { ok:true, email, id, readonly, source:'get_contact' });
   } catch (err) {
     const dbg = (process.env.DEBUG === '1');
     return jres(500, { ok:false, error: String(err?.message||err), stack: dbg ? String(err?.stack||'') : undefined });

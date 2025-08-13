@@ -1,26 +1,32 @@
-[functions]
-  node_bundler = "esbuild"
-  directory = "netlify/functions"
+[build]
+  publish = "."
+  functions = "netlify/functions"
 
-# Site-weit: Security-Header + CSP nur als Report-Only (bricht nichts)
 [[headers]]
   for = "/*"
   [headers.values]
-  Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
-  X-Content-Type-Options = "nosniff"
-  X-Frame-Options = "DENY"
-  Referrer-Policy = "no-referrer"
-  Permissions-Policy = "geolocation=(), microphone=(), camera=()"
-  Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
 
-# ENFORCE CSP NUR auf danke.html (Zero-Break-Variante)
 [[headers]]
-  for = "/danke.html"
+  for = "/"
   [headers.values]
-  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"
+    Content-Security-Policy = "default-src 'self' https:; connect-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none';"
 
-# ENFORCE CSP NUR auf privacy.html (Zero-Break-Variante)
-[[headers]]
-  for = "/privacy.html"
-  [headers.values]
-  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"
+[[redirects]]
+  from = "/api/iban_issue_token"
+  to = "/.netlify/functions/iban_issue_token"
+  status = 200
+
+[[redirects]]
+  from = "/api/iban_check"
+  to = "/.netlify/functions/iban_check"
+  status = 200
+
+[[redirects]]
+  from = "/api/iban_submit"
+  to = "/.netlify/functions/iban_submit"
+  status = 200

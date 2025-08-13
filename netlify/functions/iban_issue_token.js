@@ -13,7 +13,14 @@ exports.handler = async (event) => {
 
     if (!email) return { statusCode: 400, body: 'Missing email' };
 
-    const contact = await mjGetContactByEmail(email);
+    let contact;
+    try { contact = await mjGetContactByEmail(email); }
+    catch (e) {
+      if (String(e.message).includes('contact_not_found')) {
+        return { statusCode: 404, body: JSON.stringify({ ok:false, error:'contact_not_found', email }) };
+      }
+      throw e;
+    }
 
     const token = require('crypto').randomBytes(16).toString('hex');
     const expires = addDaysIso(Number(process.env.IBAN_TOKEN_DAYS||7));
@@ -26,9 +33,7 @@ exports.handler = async (event) => {
       token_iban_used_at: '',
       link_iban: url,
       sprache: lang,
-      iban_status: 'issued',
-      // optional: creditor id mirror (so spaeterer check noch exakter)
-      glaeubiger_last_iban: String(id)
+      iban_status: 'issued'
     });
 
     let sent = false;

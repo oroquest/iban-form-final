@@ -1,4 +1,5 @@
 
+// Native fetch (Node 18+)
 const MJ_BASE = 'https://api.mailjet.com';
 const mjAuthHeader = () => {
   const pub = process.env.MJ_APIKEY_PUBLIC;
@@ -23,18 +24,40 @@ async function mjGetContactByEmail(email) {
   return { id: contact.ID, email: contact.Email, props };
 }
 
+// Allowed property names (agreed list) – we will drop everything else to avoid 400 Invalid key name
+const IBAN_ALLOWED_PROPS = new Set([
+  'token_iban','token_iban_expiry','token_iban_used_at','link_iban','sprache','iban_status',
+  'iban','glaeubiger','bic','country','ip_iban','agent_iban','timestamp_iban'
+]);
+
 async function mjUpdateContactProps(contactId, obj) {
-  const Data = Object.keys(obj).map(Name => ({ Name, Value: obj[Name] }));
-  const r = await fetch(`${MJ_BASE}/v3/REST/contactdata/${contactId}`, {
-    method: 'PUT',
-    headers: mjAuthHeader(),
-    body: JSON.stringify({ Data })
-  });
-  if (!r.ok) {
+  // Filter to allowed props only
+  const filtered = {};
+  for (const [k,v] of Object.entries(obj||{})) {
+    if (IBAN_ALLOWED_PROPS.has(k)) filtered[k]=v;
+  }
+  let Data = Object.keys(filtered).map(Name => ({ Name, Value: filtered[Name] }));
+  if (!Data.length) return true;
+
+  // Try PUT; if Mailjet responds with invalid key, drop it and retry
+  while (true) {
+    const r = await fetch(`${MJ_BASE}/v3/REST/contactdata/${contactId}`, {
+      method: 'PUT',
+      headers: mjAuthHeader(),
+      body: JSON.stringify({ Data })
+    });
+    if (r.ok) return true;
     const t = await r.text();
+    const m = /Invalid key name:\s*"([^"]+)"/.exec(t);
+    if (m) {
+      const bad = m[1];
+      // remove bad key and retry
+      Data = Data.filter(kv => kv.Name !== bad);
+      if (!Data.length) return true;
+      continue;
+    }
     throw new Error(`mj_update_failed:${r.status}:${t}`);
   }
-  return true;
 }
 
 function buildIbanLink({ baseUrl, id, token, email, lang }) {
@@ -83,38 +106,20 @@ async function mjSendEmail({ to, subject, templateId, variables }) {
   return j;
 }
 
-function nowIso() { return new Date().toISOString(); }
 function addDaysIso(days) { return new Date(Date.now() + days*24*60*60*1000).toISOString(); }
-
-function clientIp(event) {
-  return (event.headers['x-forwarded-for'] || event.headers['client-ip'] || event.ip || '').split(',')[0].trim();
-}
-function userAgent(event) {
-  return event.headers['user-agent'] || '';
-}
-
-function sanitizeIban(s) {
-  return String(s||'').toUpperCase().replace(/\s+/g,'');
-}
-
+function clientIp(event) { return (event.headers['x-forwarded-for'] || event.headers['client-ip'] || event.ip || '').split(',')[0].trim(); }
+function userAgent(event) { return event.headers['user-agent'] || ''; }
+function sanitizeIban(s) { return String(s||'').toUpperCase().replace(/\s+/g,''); }
 function ibanIsValid(iban) {
   const s = sanitizeIban(iban);
   if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
   const rearr = s.slice(4)+s.slice(0,4);
-  const toNum = (ch)=>{
-    const c=ch.charCodeAt(0);
-    if(c>=48&&c<=57) return ch;
-    if(c>=65&&c<=90) return String(c-55);
-    return '';
-  };
-  let rem = 0;
-  let buf = '';
+  let rem=0, buf='';
   for (const ch of rearr) {
-    buf += toNum(ch);
-    while (buf.length >= 7) {
-      rem = Number(String(rem)+buf.slice(0,7)) % 97;
-      buf = buf.slice(7);
-    }
+    const c=ch.charCodeAt(0);
+    const n = (c>=48&&c<=57)? ch : (c>=65&&c<=90? String(c-55) : '');
+    buf += n;
+    while (buf.length>=7) { rem = Number(String(rem)+buf.slice(0,7)) % 97; buf = buf.slice(7); }
   }
   if (buf.length) rem = Number(String(rem)+buf) % 97;
   return rem === 1;
@@ -126,7 +131,6 @@ module.exports = {
   mjSendEmail,
   buildIbanLink,
   pickTemplate,
-  nowIso,
   addDaysIso,
   clientIp,
   userAgent,

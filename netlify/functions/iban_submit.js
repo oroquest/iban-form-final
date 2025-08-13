@@ -8,7 +8,7 @@ exports.handler = async (event) => {
     const body = isJson ? JSON.parse(event.body||'{}') : Object.fromEntries(new URLSearchParams(event.body||''));
 
     const email = Buffer.from(String(body.em||''), 'base64url').toString('utf8');
-    const id = String(body.id||'');
+    const id = body.id || '';
     const token = String(body.token||'').trim();
     const lang = (body.lang||'de').toLowerCase();
     const iban = sanitizeIban(body.iban||'');
@@ -30,9 +30,8 @@ exports.handler = async (event) => {
     if (now > expiry && !testMode) return { statusCode: 410, body: JSON.stringify({ ok:false, error:'Token expired' }) };
     if (p.token_iban_used_at) return { statusCode: 409, body: JSON.stringify({ ok:false, error:'Token already used' }) };
 
-    // STRICT id check as in verify
-    const primaryId = (p.glaeubiger ?? p.glaeubiger_nr ?? p.creditor_id ?? p.id);
-    if (primaryId && String(primaryId) !== id) {
+    const ids = [p.glaeubiger, p.glaeubiger_nr, p.creditor_id, p.id].filter(Boolean).map(String);
+    if (ids.length && !ids.includes(String(id))) {
       return { statusCode: 403, body: JSON.stringify({ ok:false, error:'ID mismatch' }) };
     }
 

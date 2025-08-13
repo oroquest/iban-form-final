@@ -5,7 +5,7 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method Not Allowed' };
     const qs = event.queryStringParameters || {};
-    const id = String(qs.id||'');
+    const id = qs.id || '';
     const token = String(qs.token||'').trim();
     const lang = (qs.lang||'de').toLowerCase();
     const email = Buffer.from(String(qs.em||''), 'base64url').toString('utf8');
@@ -15,31 +15,28 @@ exports.handler = async (event) => {
     const contact = await mjGetContactByEmail(email);
     const p = contact.props || {};
 
-    // token & expiry
     if (p.token_iban !== token) return { statusCode: 403, body: JSON.stringify({ ok:false, error:'Invalid token' }) };
     const expiry = new Date(p.token_iban_expiry || 0).getTime();
     const now = Date.now();
     const testMode = String(process.env.IBAN_TEST_MODE||'0') === '1';
     if (now > expiry && !testMode) return { statusCode: 410, body: JSON.stringify({ ok:false, error:'Token expired' }) };
 
-    // STRICT id check aligned with verify: prefer "glaeubiger" if present
-    const primaryId = (p.glaeubiger ?? p.glaeubiger_nr ?? p.creditor_id ?? p.id);
-    if (primaryId && String(primaryId) !== id) {
+    // strict id check against contact properties (like verify)
+    const ids = [p.glaeubiger, p.glaeubiger_nr, p.creditor_id, p.id].filter(Boolean).map(String);
+    if (ids.length && !ids.includes(String(id))) {
       return { statusCode: 403, body: JSON.stringify({ ok:false, error:'ID mismatch' }) };
     }
 
-    // Status opened
     if (p.iban_status !== 'submitted') {
       try { await mjUpdateContactProps(contact.id, { iban_status: 'opened' }); } catch {}
     }
 
-    // Display mapping: use Mailjet names from VERIFY (firstname/name), no placeholders
     const display = {
-      creditor_id: id, // show the id from link
+      creditor_id: String(id),
       first_name: p.firstname || p.vorname || '',
       last_name:  p.name || p.nachname || '',
       street:     p.strasse || p.adresse_strasse || p.street || '',
-      house_no:   p.nr || p.hausnummer || p.adresse_hausnummer || '',
+      house_no:   p.hausnummer || p.nr || p.adresse_hausnummer || '',
       zip:        p.plz || p.postcode || p.adresse_plz || '',
       city:       p.ort || p.city || p.adresse_ort || '',
       country:    p.land || p.country || p.adresse_land || '',

@@ -26,7 +26,9 @@ exports.handler = async (event) => {
       token_iban_used_at: '',
       link_iban: url,
       sprache: lang,
-      iban_status: 'issued'
+      iban_status: 'issued',
+      // optional: creditor id mirror (so spaeterer check noch exakter)
+      glaeubiger_last_iban: String(id)
     });
 
     let sent = false;

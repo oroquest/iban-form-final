@@ -1,5 +1,4 @@
 
-// Using native fetch available in Node 18+ (Netlify Functions runtime)
 const MJ_BASE = 'https://api.mailjet.com';
 const mjAuthHeader = () => {
   const pub = process.env.MJ_APIKEY_PUBLIC;
@@ -51,7 +50,7 @@ function buildIbanLink({ baseUrl, id, token, email, lang }) {
 function pickTemplate({ language, category }) {
   const catNorm = String(category || '').trim().toUpperCase();
   const lang = String(language || 'de').toLowerCase();
-  const finalLang = (lang === 'it') ? 'en' : lang; // IT → EN
+  const finalLang = (lang === 'it') ? 'en' : lang;
   const map = {
     'de__VN DIREKT': process.env.TEMPLATE_DE_IBAN_DIRECT,
     'de__VN ANWALT': process.env.TEMPLATE_DE_IBAN_LAWYER,

@@ -1,4 +1,24 @@
 
+function normalizeIBAN(i){ return (i||"").replace(/\s+/g,"").toUpperCase(); }
+function ibanChecksum(iban){
+  const rearr = iban.slice(4) + iban.slice(0,4);
+  const expanded = rearr.replace(/[A-Z]/g, c => (c.charCodeAt(0)-55).toString());
+  let rem = 0;
+  for (let i=0; i<expanded.length; i+=6) {
+    rem = Number(String(rem) + expanded.substr(i,6)) % 97;
+  }
+  return rem;
+}
+function isValidIBAN(input){
+  const IBAN = normalizeIBAN(input);
+  const len = { CH:21, LI:21, DE:22, AT:20, IT:27, FR:27, GB:22, NL:18, BE:16 };
+  if (!/^[A-Z]{2}[0-9A-Z]{12,34}$/.test(IBAN)) return false;
+  const cc = IBAN.slice(0,2);
+  if (len[cc] && IBAN.length !== len[cc]) return false;
+  return ibanChecksum(IBAN) === 1;
+}
+
+
 let currentLang = "de";
 
 function setLanguage(lang) {
@@ -51,7 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("token").value = token;
 
   try {
-    const response = await fetch(`/.netlify/functions/iban?id=${glaeubigerId}&token=${token}`);
+    const response = await fetch(`/.netlify/functions/verify?id=${glaeubigerId}&token=${token}`);
     const result = await response.json();
 
     if (!response.ok) {

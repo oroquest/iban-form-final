@@ -1,5 +1,12 @@
 {
-  "name": "visionflow-verify",
+  "name": "iban-sikuralife",
   "version": "1.0.0",
-  "dependencies": {}
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.12"
+  }
 }
